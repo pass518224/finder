@@ -15,6 +15,8 @@ class Path(Config):
     TOOLS       = path.dirname(path.abspath(__file__))
     PROJECT     = path.abspath(path.join( TOOLS , ".." ))
     _IINTERFACE = path.abspath(path.join( PROJECT, "_IInterface" ))
+    OUT         = path.abspath(path.join( PROJECT, "out" ))
+
 
 class System(Config):
     WORKINGDIR  = path.abspath("/home/lucas/WORKING_DIRECTORY/")

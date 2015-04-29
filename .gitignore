@@ -1,8 +1,11 @@
 # for Finder project usage
 _IInterface/
+out/
 
-
-
+# ply generated files
+lextab.py
+parsetab.py
+parser.out
 
 
 

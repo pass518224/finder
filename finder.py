@@ -4,6 +4,7 @@ import logging
 import lib.Parse as Parse
 import lib.ProcessTable as PTable
 import lib.ProcessAdaptor as PAdaptor
+import lib.Transaction as Transaction
 
 def finder():
     """entry function"""
@@ -19,6 +20,12 @@ def finder():
                 pAdaptor.action(info)
             except PAdaptor.UnknownRule:
                 logging.warn("unknown rule: " + str(info))
+        elif flag == Parse.WRITE_READ:
+            try:
+                transaction = Transaction.Transaction(sys_log.getInfo())
+                print str(transaction)
+            except Transaction.TransactionError as e:
+                logger.warn("transaction error: " + e.args[0])
 
     #pTable.dumpTable()
 
