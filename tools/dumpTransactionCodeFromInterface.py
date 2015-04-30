@@ -21,13 +21,29 @@ def parseTransactionCode(inputFd):
     interface_declaration = tree.type_declarations[0]
 
     result = {}
-    #print interface_declaration.body
-    for i in interface_declaration.body:
+    result["data"] = {}
+
+    interfaceBody = interface_declaration.body
+
+    #find stub class
+    body = interface_declaration.body
+    for node in interfaceBody:
+        if type(node) == model.ClassDeclaration and node.name == "Stub": 
+            body = node.body
+            break
+
+    for i in body:
         if  type(i) == model.FieldDeclaration:
-            if type(i.variable_declarators[0].initializer) == model.Additive:
-                flag = i.variable_declarators[0].variable.name
-                code = int(i.variable_declarators[0].initializer.rhs.value) + 1
-                result[code] = flag
+            declaration = i.variable_declarators[0]
+            name = declaration.variable.name
+            initializer = declaration.initializer
+            if type(initializer) is model.Literal:# and name.lower() is "descriptor":
+                result["descriptor"] = initializer.value[1:-1]
+            else:
+                if type(initializer) is model.Name:
+                    result["data"][name] = 1
+                elif type(initializer) is model.Additive:
+                    result["data"][name] = 1 + int(initializer.rhs.value)
 
     return result
 
@@ -40,9 +56,11 @@ if __name__ == '__main__':
 
     for filePath in filePaths:
         logger.info("parsing file [{}]...".format(filePath))
-        with open(os.path.join(inputDir, filePath), "r") as inputFd, open(os.path.join(outputDir, filePath), "w") as outputFd:
+        with open(os.path.join(inputDir, filePath), "r") as inputFd:
             result = parseTransactionCode(inputFd)
-            outputFd.write(json.JSONEncoder().encode(result))
+            result["filename"] = filePath
+            
+        with open(os.path.join(outputDir, result["descriptor"]), "w") as outputFd:
+            outputFd.write(json.JSONEncoder(sort_keys = True, indent = 4).encode(result))
 
-        logger.info("Parsing done")
 
