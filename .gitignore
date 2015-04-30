@@ -1,5 +1,6 @@
 # for Finder project usage
 _IInterface/
+_Stub/
 out/
 
 # ply generated files
@@ -8,6 +9,8 @@ parsetab.py
 parser.out
 
 
+#vim swap
+*.swp
 
 
 
@@ -30,7 +33,7 @@ dist/
 downloads/
 eggs/
 .eggs/
-lib/
+#lib/
 lib64/
 parts/
 sdist/

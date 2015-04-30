@@ -4,14 +4,26 @@ import logging
 import lib.Parse as Parse
 import lib.ProcessTable as PTable
 import lib.ProcessAdaptor as PAdaptor
+import lib.TransactionManager as TrManager
 import lib.Transaction as Transaction
+
+import lib.InterfaceLoader as ILoader
 
 def finder():
     """entry function"""
     fd = open("/home/lucas/Downloads/syslog/kmsg.sample", "r")
     sys_log = Parse.Parser(fd)
+
+    #process related
     pTable = PTable.ProcessTable()
     pAdaptor = PAdaptor.ProcessAdaptor(pTable)
+
+    #loaders
+    iLoader = ILoader.InterfaceLoader()
+
+    #transaction manger
+    tManager = TrManager.TransactionManager(pTable, iLoader)
+
     for flag in sys_log:
         if flag == Parse.INFO:
             # handle system INFO
@@ -22,10 +34,11 @@ def finder():
                 logging.warn("unknown rule: " + str(info))
         elif flag == Parse.WRITE_READ:
             try:
-                transaction = Transaction.Transaction(sys_log.getInfo())
-                print str(transaction)
+                tManager.addTransaction( Transaction.Transaction(sys_log.getInfo()) )
             except Transaction.TransactionError as e:
                 logger.warn("transaction error: " + e.args[0])
+
+    tManager.dump()
 
     #pTable.dumpTable()
 
