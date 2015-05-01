@@ -44,9 +44,8 @@ class Parser(Iterator):
 
             #parse the format
             if  raw[0] is "[":  # system related infomation
-                if  raw.find("Error dump") > 0:
-                    logger.warn("Error dump: " + raw)
-                    continue
+                if  raw.find("Error dump: sys") > 0:
+                    raw = raw.replace("Error dump: sys", "Error_dump_sys")
 
                 flag = INFO
                 info = infoCreator(raw)
@@ -71,6 +70,8 @@ class Parser(Iterator):
                     continue
                 
                 info = infoCreator(raw)
+                if len(info) < 1:
+                    print "asfasdfjaklsfjakljfakldklajkl"
                 info["type"] = type
 
                 self.info = info
