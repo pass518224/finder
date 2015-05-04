@@ -1,5 +1,7 @@
 import logging
 import ProcessTable
+import Parcel
+import InterfaceLoader
 
 logger = logging.getLogger(__name__)
 
@@ -8,6 +10,23 @@ class TransactionManager(object):
     def __init__(self, processTable, interfaceLoader):
         self.processTable = processTable
         self.iLoader = interfaceLoader
+
+        self.hardwareDescriptors = [
+                "android.net.INetworkStatsService",
+                "android.gui.IGraphicBufferProducer",
+                "android.gui.DisplayEventConnection",
+                "android.ui.ISurfaceComposer",
+                "android.ui.ISurfaceComposerClient",
+                "android.media.IAudioFlinger",
+                "android.media.IAudioFlingerClient",
+                "android.media.IAudioPolicyService",
+                "android.media.IMediaPlayerService",
+                "android.utils.IMemoryHeap",
+                "android.ui.IGraphicBufferAlloc",
+                "android.media.IAudioTrack",
+                "android.utils.IMemory",
+                "drm.IDrmManagerService"
+                ]
 
         self.transactions = []
 
@@ -32,5 +51,33 @@ class TransactionManager(object):
 
     def dump(self):
         for tra in self.transactions:
-            print tra.from_proc, tra.from_proc_name,  tra.from_thread_name
-        
+            """
+            print "[{pid}]{pname}:{tname} {type}".format(pid = tra.from_proc, pname = tra.from_proc_name, tname = tra.from_thread_name, type = tra.type)
+            print tra.parcel
+            print "____"
+            """
+            if  tra.type == "BC_TRANSACTION":
+                if  int(tra.length) > 0:
+                    try:
+                        descriptor = tra.parcel.getDescriptor()
+                    except Parcel.IllegalParcel as e:
+                        logger.info(tra)
+                        logger.warn(e.args[0])
+                else:
+                    continue
+
+                if  descriptor in self.hardwareDescriptors:
+                    continue
+                try:
+                    formater = {
+                            "pid": tra.from_proc,
+                            "pname": tra.from_proc_name,
+                            "tname": tra.from_thread_name,
+                            "type": tra.type,
+                            "code": self.iLoader.getCode(descriptor, tra.code)
+                            }
+                    print "[{pid}]{pname}:{tname} {type}/{code}".format(**formater)
+                    print tra.parcel
+                    print "____"
+                except InterfaceLoader.NoneExistCode as e:
+                    logger.warn("missed transaction {}[{}]".format(descriptor, tra.code))

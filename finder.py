@@ -1,5 +1,6 @@
 #! /usr/bin/env python2.7
 import logging
+import os
 
 import lib.Parse as Parse
 import lib.ProcessTable as PTable
@@ -8,6 +9,8 @@ import lib.TransactionManager as TrManager
 import lib.Transaction as Transaction
 
 import lib.InterfaceLoader as ILoader
+
+import tools.Config as Config
 
 def finder():
     """entry function"""
@@ -19,7 +22,8 @@ def finder():
     pAdaptor = PAdaptor.ProcessAdaptor(pTable)
 
     #loaders
-    iLoader = ILoader.InterfaceLoader()
+    iLoader = ILoader.InterfaceLoader(os.path.join(Config.Path.OUT, "interface"))
+
 
     #transaction manger
     tManager = TrManager.TransactionManager(pTable, iLoader)

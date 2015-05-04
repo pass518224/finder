@@ -1,3 +1,5 @@
+#config file
+
 from os import path
 
 class Config(object):
@@ -21,6 +23,7 @@ class Path(Config):
 class System(Config):
     WORKINGDIR  = path.abspath("/home/lucas/WORKING_DIRECTORY/")
     FRAMEWORK   = path.abspath(path.join(WORKINGDIR, "frameworks"))
+    AIDL_CACHE   = path.abspath(path.join(WORKINGDIR, "out/target/common/obj/JAVA_LIBRARIES/framework-base_intermediates/"))
         
         
 
