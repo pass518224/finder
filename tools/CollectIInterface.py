@@ -39,6 +39,7 @@ if __name__ == '__main__':
     framework = Config.System.FRAMEWORK
     aidl      = Config.System.AIDL_CACHE
 
+    logger.info("Collecting system lovel interface: ")
     for file in fileWalker(framework, excludePattern, includePattern):
         with open(file, "r") as fd:
             buf = fd.read()
@@ -47,6 +48,7 @@ if __name__ == '__main__':
                 shutil.copyfile(file, os.path.join(Config.Path._IINTERFACE, t_file))
                 logger.info("Matched file: [{}]".format(file))
                 
+    logger.info("Collecting AIDL interface: ")
     for file in fileWalker(aidl, excludePattern, ["*.java"]):
         with open(file, "r") as fd:
             buf = fd.read()

@@ -22,7 +22,7 @@ def dumper(name, object, indent=0, indent_prefix = "    "):
         print "{indent}{r_name}: '{val}'".format( indent = indent_prefix*indent, r_name = name, val = str(object))
 
 if __name__ == '__main__':
-    filePath = "/home/lucas/WORKING_DIRECTORY/kernel/goldfish/Finder/_IInterface/IActivityManager.java"
+    filePath = "/home/lucas/Downloads/IBluetooth.java"
     parser = plyj.Parser()
     tree = parser.parse_file(file(filePath))    # syntax tree root
     #print tree
