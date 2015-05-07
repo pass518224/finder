@@ -14,10 +14,12 @@ class Config(object):
             print "{0:>12} {1}".format(mem, getattr(self, mem))
 
 class Path(Config):
-    TOOLS       = path.dirname(path.abspath(__file__))
-    PROJECT     = path.abspath(path.join( TOOLS , ".." ))
-    _IINTERFACE = path.abspath(path.join( PROJECT, "_IInterface" ))
-    OUT         = path.abspath(path.join( PROJECT, "out" ))
+    TOOLS        = path.dirname(path.abspath(__file__))
+    PROJECT      = path.abspath(path.join( TOOLS , ".." ))
+    _IINTERFACE  = path.abspath(path.join( PROJECT, "_IInterface" ))
+    _STUB        = path.abspath(path.join( PROJECT, "_Stub" ))
+    _NATIVE_STUB = path.abspath(path.join( PROJECT, "_Native_Stub" ))
+    OUT          = path.abspath(path.join( PROJECT, "out" ))
 
 
 class System(Config):
