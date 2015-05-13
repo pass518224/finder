@@ -1,6 +1,7 @@
 #config file
 
 from os import path
+from xml.etree import ElementTree
 import os
 
 class Config(object):
@@ -24,9 +25,12 @@ class Path(Config):
 
 
 class System(Config):
-    WORKINGDIR  = path.abspath(os.getenv("FINDER_ANDROID_FRAMEWORK_PATH"))
+    WORKINGDIR  = path.abspath(os.getenv("ANDROID_SDK_SRC"))
     FRAMEWORK   = path.abspath(path.join(WORKINGDIR, "frameworks"))
-    AIDL_CACHE   = path.abspath(path.join(WORKINGDIR, "out/target/common/obj/JAVA_LIBRARIES/framework-base_intermediates/"))
+    AIDL_CACHE   = path.abspath(path.join(WORKINGDIR, "out/target/common/obj/JAVA_LIBRARIES/framework_intermediates/"))
+
+    manifest_root = ElementTree.parse(path.join(WORKINGDIR, '.repo/manifest.xml')).getroot()
+    VERSION = manifest_root.find('default').attrib["revision"].split("/")[-1]
         
         
 

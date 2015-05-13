@@ -38,6 +38,9 @@ if __name__ == '__main__':
 
     framework = Config.System.FRAMEWORK
     aidl      = Config.System.AIDL_CACHE
+    interface = Config.Path._IINTERFACE
+    if not os.path.exists(interface):
+        os.makedirs(interface)
 
     logger.info("Collecting system lovel interface: ")
     for file in fileWalker(framework, excludePattern, includePattern):
@@ -45,7 +48,7 @@ if __name__ == '__main__':
             buf = fd.read()
             if  buf.find("extends IInterface") > 0 or buf.find("extends android.os.IInterface") > 0:
                 t_file = file.split("/")[-1]
-                shutil.copyfile(file, os.path.join(Config.Path._IINTERFACE, t_file))
+                shutil.copyfile(file, os.path.join(interface, t_file))
                 logger.info("Matched file: [{}]".format(file))
                 
     logger.info("Collecting AIDL interface: ")
@@ -54,5 +57,5 @@ if __name__ == '__main__':
             buf = fd.read()
             if  buf.find("extends IInterface") > 0 or buf.find("extends android.os.IInterface") > 0:
                 t_file = file.split("/")[-1]
-                shutil.copyfile(file, os.path.join(Config.Path._IINTERFACE, t_file))
+                shutil.copyfile(file, os.path.join(interface, t_file))
                 logger.info("Matched file: [{}]".format(file))

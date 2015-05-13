@@ -112,17 +112,24 @@ abstract public class ContentProviderNative extends Binder implements IContentPr
                     Cursor cursor = query(callingPkg, url, projection, selection, selectionArgs,
                             sortOrder, cancellationSignal);
                     if (cursor != null) {
+                        CursorToBulkCursorAdaptor adaptor = null;
+
                         try {
-                            CursorToBulkCursorAdaptor adaptor = new CursorToBulkCursorAdaptor(
-                                    cursor, observer, getProviderName());
-                            BulkCursorDescriptor d = adaptor.getBulkCursorDescriptor();
+                            adaptor = new CursorToBulkCursorAdaptor(cursor, observer,
+                                    getProviderName());
                             cursor = null;
+
+                            BulkCursorDescriptor d = adaptor.getBulkCursorDescriptor();
+                            adaptor = null;
 
                             reply.writeNoException();
                             reply.writeInt(1);
                             d.writeToParcel(reply, Parcelable.PARCELABLE_WRITE_RETURN_VALUE);
                         } finally {
                             // Close cursor if an exception was thrown while constructing the adaptor.
+                            if (adaptor != null) {
+                                adaptor.close();
+                            }
                             if (cursor != null) {
                                 cursor.close();
                             }
@@ -227,9 +234,10 @@ abstract public class ContentProviderNative extends Binder implements IContentPr
                     String mode = data.readString();
                     ICancellationSignal signal = ICancellationSignal.Stub.asInterface(
                             data.readStrongBinder());
+                    IBinder callerToken = data.readStrongBinder();
 
                     ParcelFileDescriptor fd;
-                    fd = openFile(callingPkg, url, mode, signal);
+                    fd = openFile(callingPkg, url, mode, signal, callerToken);
                     reply.writeNoException();
                     if (fd != null) {
                         reply.writeInt(1);
@@ -568,7 +576,7 @@ final class ContentProviderProxy implements IContentProvider
 
     @Override
     public ParcelFileDescriptor openFile(
-            String callingPkg, Uri url, String mode, ICancellationSignal signal)
+            String callingPkg, Uri url, String mode, ICancellationSignal signal, IBinder token)
             throws RemoteException, FileNotFoundException {
         Parcel data = Parcel.obtain();
         Parcel reply = Parcel.obtain();
@@ -579,6 +587,7 @@ final class ContentProviderProxy implements IContentProvider
             url.writeToParcel(data, 0);
             data.writeString(mode);
             data.writeStrongBinder(signal != null ? signal.asBinder() : null);
+            data.writeStrongBinder(token);
 
             mRemote.transact(IContentProvider.OPEN_FILE_TRANSACTION, data, reply, 0);
 

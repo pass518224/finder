@@ -51,8 +51,11 @@ if __name__ == '__main__':
     logger.setLevel(logging.DEBUG)
 
     inputDir  = Config.Path._IINTERFACE
-    outputDir = os.path.join(Config.Path.OUT, "interface")
+    outputDir = os.path.join(Config.Path.OUT, Config.System.VERSION, "interface")
     filePaths = os.listdir(inputDir)
+
+    if not os.path.exists(outputDir):
+        os.makedirs(outputDir)
 
     for filePath in filePaths:
         logger.info("parsing file [{}]...".format(filePath))

@@ -68,7 +68,7 @@ class VariableManager(object):
         return self.pointer
 
     def dump(self):
-        print json.dumps(self.vTable, indent=4)
+        return json.dumps(self.vTable, indent=4)
 
 class Compiler(object):
     """docstring for st"""
@@ -78,6 +78,8 @@ class Compiler(object):
         self.level = level
         self.stopTranslate = False
         self.dependencyPaths = dependencyPaths
+        self.hasImplement = False
+        self.interfaceCache = {}
 
         self.formater = Formater()
         if  vManager:
@@ -87,17 +89,11 @@ class Compiler(object):
         self.dManager = VariableManager() # use to manage dependency of extend/implement variables
         self.managers = []
         self.managers.append(self.vManager)
-        
 
-    def initializer(self):
+    def header(self):
         fmtr = self.formater
         self.p( fmtr.importer("Switch", f = "Switch"))
         self.p( fmtr.importer("Stub", f = "Stub"))
-        self.p("class OnTransact(Stub):\n")
-        self.level += 1
-        self.p("def __init__(self, code, data)\n")
-        self.level += 1
-        self.level = 0
 
     def p(self, fmt):
         if  self.fd is not None:
@@ -116,6 +112,8 @@ class Compiler(object):
     def compile(self, body):
         """ entry function """
         self.solver(body)
+        if  not self.hasImplement:
+            raise NotFoundStub
 
     def crawlDependency(self, name):
         filename = name.split(".")[-1] # get last name seperate by DOT
@@ -126,15 +124,23 @@ class Compiler(object):
         if  self.dependencyPaths == None: # no given search paths
             return
 
+        if  filename in self.interfaceCache:
+            variableTree = self._index(self.interfaceCache[filename], name)
+            self.dManager.update(variableTree)
+            return
+
         for searchPath in self.dependencyPaths:
             files = os.listdir(searchPath)
             if  filename + ".java" in files:
-                compiler = Compiler()
+                logger.info("Solving interface: [{}]".format(filename))
                 parser = plyj.Parser()
                 root = parser.parse_file(os.path.join(searchPath, filename + ".java"))
-                compiler.compile(root)
-                parsedManager = compiler.vManager.vTable
-                variableTree = self._index(parsedManager, name)
+
+                solvedFile = InterfaceResolver(fd = self.fd)
+                solvedFile.compile(root)
+                vTable = solvedFile.vManager.vTable
+                self.interfaceCache[filename] = vTable
+                variableTree = self._index(vTable, name)
                 self.dManager.update(variableTree)
 
     def _index(self, rootTree, name):
@@ -186,21 +192,28 @@ class Compiler(object):
         implements=<type 'list'>
         implements = []
         """
-        name = self.solver(body.name)
-        self.indent(name)
+        self.level = 0
         for impl in body.implements:
             self.crawlDependency( self.solver(impl) )
+
+        name = self.solver(body.name)
         if  name == "Stub" or name.find("Native") > 0:
-            for comp in body.body:
-                self.solver(comp)
+            self.p("class OnTransact(Stub):\n")
+            self.p("    def __init__(self, code, data, reply):\n")
+            self.hasImplement = True
+
+        self.indent(name)
+        for comp in body.body:
+            self.solver(comp)
         self.unindent()
 
     def FieldDeclaration(self, body):
         mtype = self.solver(body.type)
         variable_declarators = []
         for var in body.variable_declarators:
-            variable_declarators.append( self.solver(var))
-        #modifiers=<type 'list'>
+            if  type(var.initializer) == plyj.Literal:
+                variable, initializer = self.solver(var)
+                self.p("    {} = {}\n".format(variable, initializer))
 
     def ConstructorDeclaration(self, body):
         return None
@@ -216,14 +229,13 @@ class Compiler(object):
         #extended_dims=<type 'int'>
         #throws=<class 'plyj.model.Throws'
 
-        self.indent(name)
-        for parameter in body.parameters:
-            self.solver(parameter)
         if  name == "onTransact" and body is not None:
+            self.indent(name)
             for comp in body.body:
                 self.solver(comp)
             self.unindent()
         else:
+            self.indent(name)
             self.unindent()
         return None
         
@@ -247,14 +259,14 @@ class Compiler(object):
         self.p("for mycase in Switch({}):\n".format(value))
         self.indent("Switch")
         for case in cases:
-            getattr(self, case.__class__.__name__)(case)
+            self.solver(case)
         self.unindent()
 
     def SwitchCase(self, body):
         cases = body.cases
         body  = body.body
 
-        self.p("if {case}:\n".format(case=" and ".join("mycase(" + i.value + ")" for i in cases)))
+        self.p("if {case}:\n".format(case=" and ".join("mycase(\"" + i.value + "\")" for i in cases)))
         self.indent(" and ".join("mycase(" + i.value + ")" for i in cases))
 
         for comp in body:
@@ -470,6 +482,9 @@ class Compiler(object):
             return "{} += 1".format(expression)
         return "{}{}".format(sign, expression)
 
+    def Cast(self, body):
+        return
+
     def ArrayCreation(self, body):
         # ArrayCreation(type='int', dimensions=[Name(value='_arg4_length')], initializer=None)
         mtype = self.solver(body.type)
@@ -491,41 +506,52 @@ class Compiler(object):
         target = self.solver(body.target)
         return "{}[{}]".format(target, index)
 
-    def parse_body(self, body):
-        for comp in body:
-            name = comp.__class__.__name__
-            fun = getattr(self, name)
-            fun(comp)
-
     def solver(self, thing):
         if  type(thing) == type(None):
             return thing
         if  type(thing) == str:
             return thing
-        logger.debug(self.indentPattern*self.level + thing.__class__.__name__)
         return getattr(self, thing.__class__.__name__)(thing)
+
 
 class InterfaceResolver(Compiler):
     """docstring for InterfaceResolver"""
     def __init__(self, *args, **kargs):
-        kargs["vManager"] = Manager()
         super(InterfaceResolver, self).__init__(*args, **kargs)
+
+    def InterfaceDeclaration(self, body):
+        name = self.solver(body.name)
+        #modifiers=<type 'list'>
+        #extends=<type 'list'>
+        #type_parameters=<type 'list'>
+        self.p("class {}:\n".format(name))
+        self.indent(name)
+        for comp in body.body:
+            self.solver(comp)
+        self.unindent()
+
+    def FieldDeclaration(self, body):
+        mtype = self.solver(body.type)
+        variable_declarators = []
+        for var in body.variable_declarators:
+            if  type(var.initializer) == plyj.Literal:
+                variable, initializer = self.solver(var)
+                self.p("{} = {}\n".format(variable, initializer))
 
     def MethodDeclaration(self, body):
         name = self.solver(body.name)
-        #modifiers=<type 'list'>
-        #type_arguments =<type 'list'>
-        #parameters=<type 'list'>
         return_type = self.solver(body.return_type)
-        #body=<type 'NoneType'>
-        #abstract=<type 'bool'>
-        #extended_dims=<type 'int'>
-        #throws=<class 'plyj.model.Throws'
 
-    class Manager(VariableManager):
-        def unindent(self):
-            pass
-            
+        self.indent(name)
+        self.unindent()
+        return None
+
+    def crawlDependency(self, name):
+        return 
+
+    def compile(self, body):
+        """ entry function """
+        self.solver(body)
         
          
 class Undefined(Exception):
@@ -552,39 +578,48 @@ def translator(inputFd, outputFd):
 
     #compiler = Compiler(outputFd)
     compiler = Compiler(fd = outputFd, dependencyPaths = [Config.Path._IINTERFACE])
-    compiler.initializer()
+    compiler.header()
     compiler.compile(root)
+
 
 if __name__ == '__main__':
     logging.basicConfig()
-    logger.setLevel(logging.INFO)
+    logger.setLevel(logging.DEBUG)
     creators = set()
 
     
     """
-    #inputPath = "/home/lucas/kernel/goldfish/Finder/_IInterface/IBluetooth.java"
-    inputPath = "/home/lucas/kernel/goldfish/Finder/_NativeStub/ApplicationThreadNative.java"
+    #inputPath = os.path.join(Config.Path._IINTERFACE, "IAccessibilityInteractionConnection.java")
+    inputPath = os.path.join(Config.Path._NATIVE_STUB, Config.System.VERSION, "ApplicationThreadNative.java")
     with open(inputPath, "r") as inputFd:
         translator(inputFd, sys.stdout)
 
     """
     sourcePath = Config.Path._IINTERFACE
-    outputPath = Config.Path.OUT
+    outputPath = os.path.join(Config.Path.OUT, Config.System.VERSION, "stub")
+    if not os.path.exists(outputPath):
+        os.makedirs(outputPath)
 
     for file in os.listdir(sourcePath):
-        with open(os.path.join(sourcePath, file), "r") as inputFd, open(os.path.join(outputPath, "Stub", ".".join(file.split(".")[:-1])+".py"), "w") as outputFd:
-            logger.info(file)
+        inputFile = os.path.join(sourcePath, file)
+        outputFile = os.path.join(outputPath, ".".join(file.split(".")[:-1])+".py")
+        with open(inputFile, "r") as inputFd, open(outputFile, "w") as outputFd:
+            logger.info("parsing file: [{}]".format(file))
             try:
                 translator(inputFd, outputFd)
             except NotFoundStub as e:
-                print file
+                os.remove(outputFile)
+                logger.warn("Not Found stub in file. # remove '{}'".format(file))
 
-    sourcePath = Config.Path._NATIVE_STUB
+    sourcePath = os.path.join(Config.Path._NATIVE_STUB, Config.System.VERSION)
     for file in os.listdir(sourcePath):
-        with open(os.path.join(sourcePath, file), "r") as inputFd, open(os.path.join(outputPath, "Stub", ".".join(file.split(".")[:-1])+".py"), "w") as outputFd:
-            logger.info(file)
+        inputFile = os.path.join(sourcePath, file)
+        outputFile = os.path.join(outputPath, ".".join(file.split(".")[:-1])+".py")
+        with open(inputFile, "r") as inputFd, open(outputFile, "w") as outputFd:
+            logger.info("parsing file: [{}]".format(file))
             try:
                 translator(inputFd, outputFd)
             except NotFoundStub as e:
-                print file
+                os.remove(outputFile)
+                logger.warn("Not Found stub in file. # remove '{}'".format(file))
     print creators
