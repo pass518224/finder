@@ -1,6 +1,7 @@
 #config file
 
 from os import path
+import os
 
 class Config(object):
     def __init__(self):
@@ -18,12 +19,12 @@ class Path(Config):
     PROJECT      = path.abspath(path.join( TOOLS , ".." ))
     _IINTERFACE  = path.abspath(path.join( PROJECT, "_IInterface" ))
     _STUB        = path.abspath(path.join( PROJECT, "_Stub" ))
-    _NATIVE_STUB = path.abspath(path.join( PROJECT, "_Native_Stub" ))
+    _NATIVE_STUB = path.abspath(path.join( PROJECT, "_NativeStub" ))
     OUT          = path.abspath(path.join( PROJECT, "out" ))
 
 
 class System(Config):
-    WORKINGDIR  = path.abspath("/home/lucas/WORKING_DIRECTORY/")
+    WORKINGDIR  = path.abspath(os.getenv("FINDER_ANDROID_FRAMEWORK_PATH"))
     FRAMEWORK   = path.abspath(path.join(WORKINGDIR, "frameworks"))
     AIDL_CACHE   = path.abspath(path.join(WORKINGDIR, "out/target/common/obj/JAVA_LIBRARIES/framework-base_intermediates/"))
         

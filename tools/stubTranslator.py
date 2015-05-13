@@ -10,6 +10,8 @@ import Config
 
 logger = logging.getLogger(__name__)
 
+builtinTypes = ["String", "int"]
+
 class Formater(object):
     """docstring for CodeHelper"""
     def __init__(self):
@@ -49,9 +51,16 @@ class VariableManager(object):
     def newVariable(self, name, type):
         self.pointer[name] = type
 
+    def update(self, tree):
+        self.pointer.update(tree)
+
     def isExist(self, name):
-        for level in self.vTable:
-            if  name in level:
+        pointer = self.vTable
+        if  name in pointer:
+            return True
+        for index in self.path:
+            pointer = pointer[index]
+            if  name in pointer:
                 return True
         return False
 
@@ -59,24 +68,26 @@ class VariableManager(object):
         return self.pointer
 
     def dump(self):
-        print json.dumps(self.vTable, sort_keys=True, indent=4)
+        print json.dumps(self.vTable, indent=4)
 
 class Compiler(object):
     """docstring for st"""
-    def __init__(self, fd = None, indent = "    ", level = 0, dependencyPath = None, vManager = None):
+    def __init__(self, fd = None, indent = "    ", level = 0, dependencyPaths = None, vManager = None):
         self.fd = fd
         self.indentPattern = indent
         self.level = level
         self.stopTranslate = False
-        self.dependencyPath = dependencyPath
+        self.dependencyPaths = dependencyPaths
 
         self.formater = Formater()
         if  vManager:
             self.vManager = vManager # function symbol manager
         else:
             self.vManager = VariableManager() # variable symbol manager
+        self.dManager = VariableManager() # use to manage dependency of extend/implement variables
         self.managers = []
         self.managers.append(self.vManager)
+        
 
     def initializer(self):
         fmtr = self.formater
@@ -86,10 +97,11 @@ class Compiler(object):
         self.level += 1
         self.p("def __init__(self, code, data)\n")
         self.level += 1
+        self.level = 0
 
     def p(self, fmt):
         if  self.fd is not None:
-            self.fd.write(self.indentPattern*self.level + fmt)
+            self.fd.write(self.indentPattern*(self.level) + fmt)
 
     def indent(self, name):
         self.level += 1
@@ -104,6 +116,40 @@ class Compiler(object):
     def compile(self, body):
         """ entry function """
         self.solver(body)
+
+    def crawlDependency(self, name):
+        filename = name.split(".")[-1] # get last name seperate by DOT
+
+        if filename in self.vManager.path: # extend/implement from outter scope
+            return 
+
+        if  self.dependencyPaths == None: # no given search paths
+            return
+
+        for searchPath in self.dependencyPaths:
+            files = os.listdir(searchPath)
+            if  filename + ".java" in files:
+                compiler = Compiler()
+                parser = plyj.Parser()
+                root = parser.parse_file(os.path.join(searchPath, filename + ".java"))
+                compiler.compile(root)
+                parsedManager = compiler.vManager.vTable
+                variableTree = self._index(parsedManager, name)
+                self.dManager.update(variableTree)
+
+    def _index(self, rootTree, name):
+        candidates = []
+        for node in rootTree:
+            if  node == name:
+                return rootTree[node]
+            elif type(rootTree[node]) is dict and len(rootTree[node]) > 0:
+                candidates.append(node)
+        
+        for node in candidates:
+            result = self._index(rootTree[node], name)
+            if  result is not None:
+                return result
+        return None
 
     def CompilationUnit(self, body):
         package_declaration = self.solver(body.package_declaration)
@@ -127,8 +173,10 @@ class Compiler(object):
         #modifiers=<type 'list'>
         #extends=<type 'list'>
         #type_parameters=<type 'list'>
+        self.indent(name)
         for comp in body.body:
             self.solver(comp)
+        self.unindent()
 
     def ClassDeclaration(self, body):
         """
@@ -137,11 +185,11 @@ class Compiler(object):
         extends=<class 'plyj.model.Type'>
         implements=<type 'list'>
         implements = []
-        for impl in body.implements:
-            implements.append( self.solver.impl)
         """
         name = self.solver(body.name)
         self.indent(name)
+        for impl in body.implements:
+            self.crawlDependency( self.solver(impl) )
         if  name == "Stub" or name.find("Native") > 0:
             for comp in body.body:
                 self.solver(comp)
@@ -169,24 +217,27 @@ class Compiler(object):
         #throws=<class 'plyj.model.Throws'
 
         self.indent(name)
+        for parameter in body.parameters:
+            self.solver(parameter)
         if  name == "onTransact" and body is not None:
             for comp in body.body:
                 self.solver(comp)
             self.unindent()
         else:
             self.unindent()
-            return None
+        return None
         
     def IfThenElse(self, body):
         predicate = self.solver(body.predicate)
-        self.p("if ({}):\n".format(predicate))
+        self.p("if {}:\n".format(predicate))
         self.indent("IF")
         self.solver(body.if_true)
         self.unindent()
-        self.p("else:\n".format(predicate))
-        self.indent("ELSE:")
-        self.solver(body.if_false)
-        self.unindent()
+        if  body.if_false:
+            self.p("else:\n")
+            self.indent("ELSE:")
+            self.solver(body.if_false)
+            self.unindent()
         return None
 
     def Switch(self, body):
@@ -222,6 +273,30 @@ class Compiler(object):
                 self.stopTranslate = False
                 return
 
+    def Try(self, body):
+        """
+        block=<class 'plyj.model.Block'>
+        catches=<type 'list'>
+        _finally=<type 'NoneType'>
+        resources=<type 'list'>
+        """
+        self.solver(body.block)
+
+    def For(self, body):
+        """
+        init=<class 'plyj.model.VariableDeclaration'>
+        predicate=<class 'plyj.model.Relational'>
+        update=<type 'list'>
+        body=<class 'plyj.model.Block'>
+        """
+        self.solver(body.init)
+        self.p("while {}:\n".format(self.solver(body.predicate)))
+        self.indent("For loop")
+        self.solver(body.body)
+        for update in body.update:
+            self.p(self.solver(update) + "\n")
+        self.unindent()
+
     def Statements(self, body):
         raise Undefined
 
@@ -245,8 +320,6 @@ class Compiler(object):
         return body.value
 
     def Type(self, body):
-        if  type(body) is str:
-            return body
         tArgs = []
         for arg in body.type_arguments:
             tArgs.append(self.solver(arg))
@@ -260,18 +333,32 @@ class Compiler(object):
         return "{name}{targs}".format(name = name, targs = type_arguments )
 
     def Conditional(self, body):
-        predicate = getattr(self, body.predicate.__class__.__name__)(body.predicate)
-        if_true = getattr(self, body.if_true.__class__.__name__)(body.if_true)
-        if_false = getattr(self, body.if_false.__class__.__name__)(body.if_false)
+        predicate = self.solver(body.predicate)
+        if_true = self.solver(body.if_true)
+        if_false = self.solver(body.if_false)
         return "{if_true} if {predicate} else {if_false}".format(if_true=if_true, predicate=predicate, if_false = if_false)
 
     def Literal(self, body):
-        return body.value
+        value = body.value
+        if value == "null":
+            value = "None"
+        return value
 
     def Variable(self, body):
         name = body.name
         dimensions = body.dimensions
         return body.name
+
+    def FormalParameter(self, body):
+        """
+        variable=<class 'plyj.model.Variable'>
+        type=<class 'plyj.model.Type'>
+        modifiers=<type 'list'>
+        vararg=<type 'bool'>
+        """
+        variable = self.solver(body.variable)
+        mtype = self.solver(body.type)
+        self.vManager.newVariable(variable, mtype)
 
     def InstanceCreation(self, body):
         """
@@ -319,14 +406,19 @@ class Compiler(object):
         for arg in arguments:
             fun = getattr(self, arg.__class__.__name__)
             args.append(fun(arg))
+
         type_arguments = body.type_arguments
+        if  self.dManager.isExist(name):
+            target = "self"
+            args.insert(0, "\"{}\"".format(name))
+            self.stopTranslate = True
+            return "return {target}.callFunction({args})".format(target = target, args = ", ".join(i for i in args))
+
         if body.target is None:
             return "{name}({args})".format(name = name, args = ", ".join(i for i in args))
-
         target = self.solver(body.target)
-        if  target == "reply":
-            return None
-        elif target == "super":
+
+        if target == "super":
             return None
         elif body.target == "this": # call interface function
             target = "self"
@@ -344,31 +436,28 @@ class Compiler(object):
         if  name == "asInterface":
             offset = target.find(".Stub")
             target = target[:offset]
-            args.insert(0, target)
+            args.insert(0, "\"" + target + "\"")
             return "self.interfaceResolver({args})".format(args = ", ".join(i for i in args))
 
-        if  not self.vManager.isExist(target):
-            logger.warn("{target}.{name}({args})".format(target = target, name = name, args = ", ".join(i for i in args)))
-        
         return "{target}.{name}({args})".format(target = target, name = name, args = ", ".join(i for i in args))
     
     def Equality(self, body):
         operator = self.solver(body.operator)
         lhs = self.solver(body.lhs)
         rhs = self.solver(body.rhs)
-        return "{} {} {}".format(lhs, operator, rhs)
+        return "({} {} {})".format(lhs, operator, rhs)
 
     def Relational(self, body):
         operator = self.solver(body.operator)
         lhs = self.solver(body.lhs)
         rhs = self.solver(body.rhs)
-        return "{} {} {}".format(lhs, operator, rhs)
+        return "({} {} {})".format(lhs, operator, rhs)
 
     def Additive(self, body):
         operator = self.solver(body.operator)
         lhs = self.solver(body.lhs)
         rhs = self.solver(body.rhs)
-        return "{} {} {}".format(lhs, operator, rhs)
+        return "({} {} {})".format(lhs, operator, rhs)
     
     def Unary(self, body):
         """
@@ -377,17 +466,30 @@ class Compiler(object):
         """
         sign = body.sign
         expression = self.solver(body.expression)
+        if  sign == "x++":
+            return "{} += 1".format(expression)
         return "{}{}".format(sign, expression)
 
     def ArrayCreation(self, body):
         # ArrayCreation(type='int', dimensions=[Name(value='_arg4_length')], initializer=None)
         mtype = self.solver(body.type)
+        if  mtype in builtinTypes:
+            mtype = ""
         dims = []
         for dim in body.dimensions:
             dims.append(self.solver(dim))
-        dimensions = "".join("[{}]".format(i) for i in dims)
+        dimensions = "".join("[None for _i in range({})]".format(i) for i in dims)
         initializer = body.initializer
         return "{type}{dimensions}".format(type = mtype, dimensions = dimensions)
+    
+    def ArrayAccess(self, body):
+        """
+        index=<class 'plyj.model.Name'>
+        target=<class 'plyj.model.Name'>
+        """
+        index = self.solver(body.index)
+        target = self.solver(body.target)
+        return "{}[{}]".format(target, index)
 
     def parse_body(self, body):
         for comp in body:
@@ -449,47 +551,19 @@ def translator(inputFd, outputFd):
     root = parser.parse_file(inputFd)
 
     #compiler = Compiler(outputFd)
-    compiler = Compiler()
+    compiler = Compiler(fd = outputFd, dependencyPaths = [Config.Path._IINTERFACE])
     compiler.initializer()
     compiler.compile(root)
-    compiler.vManager.dump()
-    """
-    body = root.type_declarations[0].body
-
-    # search class 'Stub'
-    classStub = None
-    for comp in body:
-        if  hasattr(comp, "name"):
-            if  comp.name == "Stub":
-                classStub = comp
-                break
-
-    #not found class Stub
-    if classStub is None:
-        raise NotFoundStub
-
-    for method in classStub.body:
-        if  type(method) == plyj.MethodDeclaration and method.name == "onTransact":
-            methodTransact = method
-            break
-
-    compiler = Compiler(outputFd)
-    compiler = Compiler()
-    compiler.initializer()
-    compiler.parse_body(methodTransact.body)
-    """
-
 
 if __name__ == '__main__':
     logging.basicConfig()
-    logger.setLevel(logging.WARN)
+    logger.setLevel(logging.INFO)
     creators = set()
 
     
-    inputPath = "/home/lucas/WORKING_DIRECTORY/kernel/goldfish/Finder/_IInterface/IBluetooth.java"
-    #inputPath = "/home/lucas/WORKING_DIRECTORY/kernel/goldfish/Finder/_IInterface/IActivityManager.java"
-
-
+    """
+    #inputPath = "/home/lucas/kernel/goldfish/Finder/_IInterface/IBluetooth.java"
+    inputPath = "/home/lucas/kernel/goldfish/Finder/_NativeStub/ApplicationThreadNative.java"
     with open(inputPath, "r") as inputFd:
         translator(inputFd, sys.stdout)
 
@@ -504,5 +578,13 @@ if __name__ == '__main__':
                 translator(inputFd, outputFd)
             except NotFoundStub as e:
                 print file
+
+    sourcePath = Config.Path._NATIVE_STUB
+    for file in os.listdir(sourcePath):
+        with open(os.path.join(sourcePath, file), "r") as inputFd, open(os.path.join(outputPath, "Stub", ".".join(file.split(".")[:-1])+".py"), "w") as outputFd:
+            logger.info(file)
+            try:
+                translator(inputFd, outputFd)
+            except NotFoundStub as e:
+                print file
     print creators
-    """
