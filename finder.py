@@ -9,12 +9,14 @@ import lib.TransactionManager as TrManager
 import lib.Transaction as Transaction
 
 import lib.InterfaceLoader as ILoader
+import lib.StructureSolver as StructureSolver
 
 import tools.Config as Config
 
 def finder():
     """entry function"""
-    fd = open("/home/lucas/Downloads/syslog/kmsg.sample", "r")
+    path = os.path.join(Config.Path.PROJECT, 'sample', 'kmsg.short')
+    fd = open(path, "r")
     sys_log = Parse.Parser(fd)
 
     #process related
@@ -22,11 +24,12 @@ def finder():
     pAdaptor = PAdaptor.ProcessAdaptor(pTable)
 
     #loaders
-    iLoader = ILoader.InterfaceLoader(os.path.join(Config.Path.OUT, "interface"))
+    iLoader = ILoader.InterfaceLoader(os.path.join(Config.Path.OUT, Config.System.VERSION, "interface"))
+    sSolver = StructureSolver.Solver("Stubs")
 
 
     #transaction manger
-    tManager = TrManager.TransactionManager(pTable, iLoader)
+    tManager = TrManager.TransactionManager(pTable, iLoader, sSolver)
 
     for flag in sys_log:
         if flag == Parse.INFO:
@@ -47,6 +50,6 @@ def finder():
     #pTable.dumpTable()
 
 if __name__ == '__main__':
-    logging.basicConfig(level = logging.INFO)
+    logging.basicConfig(level = logging.DEBUG)
     logger = logging.getLogger(__name__)
     finder()

@@ -12,6 +12,18 @@ class Parcel(object):
         self.data = binascii.unhexlify(hex)
         self.offset = 0
 
+    def enforceInterface(self, descriptor):
+        self.offset += 4
+        print self.readString()
+        self.offset += 4
+
+    def readStrongBinder(self):
+        return self.readObject(False)
+
+    def readObject(self, nullMetaData):
+        """ TODO """
+        return None
+
     def readInt(self):
         return self.readInt32()
 
@@ -27,7 +39,8 @@ class Parcel(object):
         length = self.readInt32()
         offset = self.offset
         self.offset += length*2
-        return self.data[offset: self.offset]
+        #return self.data[offset: self.offset]
+        return ''.join([i if 31 < ord(i) < 127 else '' for i in self.data[offset: self.offset]])
 
     def getDescriptor(self):
         try:

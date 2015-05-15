@@ -1,4 +1,4 @@
-class switch(object):
+class Switch(object):
     def __init__(self, value):
         self.value = value
         self.fall = False

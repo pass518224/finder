@@ -72,6 +72,28 @@ class VariableManager(object):
 
 class Compiler(object):
     """docstring for st"""
+    # in-class function
+    def itemFilter(func):
+        """ hook on some function that will generate 'single' name,
+        such as : variable name, parameter, hard-code string
+        """
+        def replaceReservedWord(*args, **kargs):
+            _result = func(*args, **kargs)
+            reservedWord = {
+                    "null"  : "None",
+                    "is"    : "_is",
+                    "and"   : "_and",
+                    "not"   : "_not",
+                    "or"    : "_or",
+                    "false" : "False",
+                    "true"  : "True",
+                }
+            if  _result in reservedWord:
+                _result = reservedWord[_result]
+            """docstring for replaceReservedWord"""
+            return _result
+        return replaceReservedWord
+
     def __init__(self, fd = None, indent = "    ", level = 0, dependencyPaths = None, vManager = None):
         self.fd = fd
         self.indentPattern = indent
@@ -92,8 +114,8 @@ class Compiler(object):
 
     def header(self):
         fmtr = self.formater
-        self.p( fmtr.importer("Switch", f = "Switch"))
-        self.p( fmtr.importer("Stub", f = "Stub"))
+        self.p( fmtr.importer("Switch", f = "lib.Switch"))
+        self.p( fmtr.importer("Stub", f = "lib.Stub"))
 
     def p(self, fmt):
         if  self.fd is not None:
@@ -119,15 +141,15 @@ class Compiler(object):
         filename = name.split(".")[-1] # get last name seperate by DOT
 
         if filename in self.vManager.path: # extend/implement from outter scope
-            return 
+            return None
 
         if  self.dependencyPaths == None: # no given search paths
-            return
+            return None
 
         if  filename in self.interfaceCache:
             variableTree = self._index(self.interfaceCache[filename], name)
             self.dManager.update(variableTree)
-            return
+            return filename
 
         for searchPath in self.dependencyPaths:
             files = os.listdir(searchPath)
@@ -142,6 +164,7 @@ class Compiler(object):
                 self.interfaceCache[filename] = vTable
                 variableTree = self._index(vTable, name)
                 self.dManager.update(variableTree)
+                return filename
 
     def _index(self, rootTree, name):
         candidates = []
@@ -192,14 +215,21 @@ class Compiler(object):
         implements=<type 'list'>
         implements = []
         """
-        self.level = 0
+        implements = []
         for impl in body.implements:
-            self.crawlDependency( self.solver(impl) )
+            interface = self.crawlDependency( self.solver(impl) )
+            if  interface is not None:
+                implements.append(interface)
+        implements.append("Stub")
 
         name = self.solver(body.name)
         if  name == "Stub" or name.find("Native") > 0:
-            self.p("class OnTransact(Stub):\n")
-            self.p("    def __init__(self, code, data, reply):\n")
+            self.level = 0
+            self.p("class OnTransact({}):\n".format(", ".join(implements)))
+            for comp in body.body:
+                if  type(comp) == plyj.FieldDeclaration:
+                    self.solver(comp)
+            self.p("    def onTransact(self, code, data, reply):\n")
             self.hasImplement = True
 
         self.indent(name)
@@ -254,7 +284,7 @@ class Compiler(object):
 
     def Switch(self, body):
 
-        value = body.expression.value
+        value = body.expression.value.split(".")[-1]
         cases      = body.switch_cases
         self.p("for mycase in Switch({}):\n".format(value))
         self.indent("Switch")
@@ -320,16 +350,13 @@ class Compiler(object):
         operator = self.solver(body.operator)
         lhs = self.solver(body.lhs)
         rhs = self.solver(body.rhs)
+        if  self.stopTranslate:
+            return rhs
         return "{lhs} {op} {rhs}".format(lhs = lhs, op = operator, rhs = rhs)
 
 
     def Return(self, body):
         return "return {}".format(self.solver(body.result))
-
-    def Name(self, body):
-        if  type(body) is str:
-            return body
-        return body.value
 
     def Type(self, body):
         tArgs = []
@@ -350,16 +377,21 @@ class Compiler(object):
         if_false = self.solver(body.if_false)
         return "{if_true} if {predicate} else {if_false}".format(if_true=if_true, predicate=predicate, if_false = if_false)
 
-    def Literal(self, body):
+    @itemFilter
+    def Name(self, body):
         value = body.value
-        if value == "null":
-            value = "None"
         return value
 
+    @itemFilter
+    def Literal(self, body):
+        value = body.value
+        return value
+
+    @itemFilter
     def Variable(self, body):
         name = body.name
         dimensions = body.dimensions
-        return body.name
+        return name
 
     def FormalParameter(self, body):
         """
@@ -416,8 +448,16 @@ class Compiler(object):
         arguments = body.arguments
         args = []
         for arg in arguments:
-            fun = getattr(self, arg.__class__.__name__)
-            args.append(fun(arg))
+            _result = self.solver(arg)
+            if  self.stopTranslate:
+                return _result
+            if  _result.find(".CREATOR") > 0:
+                offset = _result.find(".CREATOR")
+                _result = _result[:offset]
+                args.append("\"{}\"".format(_result))
+                creators.add(_result)
+            else:
+                args.append(_result)
 
         type_arguments = body.type_arguments
         if  self.dManager.isExist(name):
@@ -495,7 +535,7 @@ class Compiler(object):
             dims.append(self.solver(dim))
         dimensions = "".join("[None for _i in range({})]".format(i) for i in dims)
         initializer = body.initializer
-        return "{type}{dimensions}".format(type = mtype, dimensions = dimensions)
+        return "{dimensions} # {type}".format(type = mtype, dimensions = dimensions)
     
     def ArrayAccess(self, body):
         """
@@ -512,6 +552,7 @@ class Compiler(object):
         if  type(thing) == str:
             return thing
         return getattr(self, thing.__class__.__name__)(thing)
+
 
 
 class InterfaceResolver(Compiler):
@@ -536,7 +577,7 @@ class InterfaceResolver(Compiler):
         for var in body.variable_declarators:
             if  type(var.initializer) == plyj.Literal:
                 variable, initializer = self.solver(var)
-                self.p("{} = {}\n".format(variable, initializer))
+                self.p("    {} = {}\n".format(variable, initializer))
 
     def MethodDeclaration(self, body):
         name = self.solver(body.name)
@@ -589,12 +630,12 @@ if __name__ == '__main__':
 
     
     """
-    #inputPath = os.path.join(Config.Path._IINTERFACE, "IAccessibilityInteractionConnection.java")
-    inputPath = os.path.join(Config.Path._NATIVE_STUB, Config.System.VERSION, "ApplicationThreadNative.java")
+    inputPath = os.path.join(Config.Path._IINTERFACE, "IPrintDocumentAdapter.java")
+    #inputPath = os.path.join(Config.Path._NATIVE_STUB, Config.System.VERSION, "ContentProviderNative.java")
     with open(inputPath, "r") as inputFd:
         translator(inputFd, sys.stdout)
-
     """
+
     sourcePath = Config.Path._IINTERFACE
     outputPath = os.path.join(Config.Path.OUT, Config.System.VERSION, "stub")
     if not os.path.exists(outputPath):
