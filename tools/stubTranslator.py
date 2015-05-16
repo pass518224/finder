@@ -116,6 +116,7 @@ class Compiler(object):
         fmtr = self.formater
         self.p( fmtr.importer("Switch", f = "lib.Switch"))
         self.p( fmtr.importer("Stub", f = "lib.Stub"))
+        self.p( fmtr.importer("*", f = "lib.JavaUtils"))
 
     def p(self, fmt):
         if  self.fd is not None:
@@ -157,14 +158,17 @@ class Compiler(object):
                 logger.info("Solving interface: [{}]".format(filename))
                 parser = plyj.Parser()
                 root = parser.parse_file(os.path.join(searchPath, filename + ".java"))
-
-                solvedFile = InterfaceResolver(fd = self.fd)
-                solvedFile.compile(root)
-                vTable = solvedFile.vManager.vTable
-                self.interfaceCache[filename] = vTable
-                variableTree = self._index(vTable, name)
-                self.dManager.update(variableTree)
+                self.solveInterface(root, filename)
                 return filename
+
+    def solveInterface(self, interface, name):
+        filename = name.split(".")[-1]
+        solvedFile = InterfaceResolver(fd = self.fd)
+        solvedFile.compile(interface)
+        vTable = solvedFile.vManager.vTable
+        self.interfaceCache[filename] = vTable
+        variableTree = self._index(vTable, name)
+        self.dManager.update(variableTree)
 
     def _index(self, rootTree, name):
         candidates = []
@@ -199,6 +203,7 @@ class Compiler(object):
 
     def InterfaceDeclaration(self, body):
         name = self.solver(body.name)
+        self.solveInterface(body, name)
         #modifiers=<type 'list'>
         #extends=<type 'list'>
         #type_parameters=<type 'list'>
@@ -284,7 +289,7 @@ class Compiler(object):
 
     def Switch(self, body):
 
-        value = body.expression.value.split(".")[-1]
+        value = body.expression.value
         cases      = body.switch_cases
         self.p("for mycase in Switch({}):\n".format(value))
         self.indent("Switch")
@@ -296,7 +301,7 @@ class Compiler(object):
         cases = body.cases
         body  = body.body
 
-        self.p("if {case}:\n".format(case=" and ".join("mycase(\"" + i.value + "\")" for i in cases)))
+        self.p("if {case}:\n".format(case=" and ".join("mycase(\"" + i.value.split(".")[-1] + "\")" for i in cases)))
         self.indent(" and ".join("mycase(" + i.value + ")" for i in cases))
 
         for comp in body:
@@ -629,9 +634,8 @@ if __name__ == '__main__':
     creators = set()
 
     
-    """
-    inputPath = os.path.join(Config.Path._IINTERFACE, "IPrintDocumentAdapter.java")
-    #inputPath = os.path.join(Config.Path._NATIVE_STUB, Config.System.VERSION, "ContentProviderNative.java")
+    inputPath = os.path.join(Config.Path._IINTERFACE, "IMountService.java")
+    #inputPath = os.path.join(Config.Path._NATIVE_STUB, Config.System.VERSION, "ServiceManagerNative.java")
     with open(inputPath, "r") as inputFd:
         translator(inputFd, sys.stdout)
     """
@@ -664,3 +668,4 @@ if __name__ == '__main__':
                 os.remove(outputFile)
                 logger.warn("Not Found stub in file. # remove '{}'".format(file))
     print creators
+    """
