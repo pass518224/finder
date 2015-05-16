@@ -2,8 +2,10 @@ import logging
 import binascii
 import string
 import struct
+import inspect
 
 logger = logging.getLogger(__name__)
+BYTE = 4
 
 class Parcel(object):
     """Parcel object to contain data"""
@@ -13,16 +15,19 @@ class Parcel(object):
         self.offset = 0
 
     def enforceInterface(self, descriptor):
-        self.offset += 4
-        print self.readString()
-        self.offset += 4
+        policy = self.readInt()
+        return self.readString()
 
     def readStrongBinder(self):
         return self.readObject(False)
 
     def readObject(self, nullMetaData):
+        self.offset += BYTE *4
         """ TODO """
         return None
+
+    def readLong(self):
+        return self.readInt64()
 
     def readInt(self):
         return self.readInt32()
@@ -30,17 +35,58 @@ class Parcel(object):
     def readInt32(self):
         offset = self.offset
         self.offset += 4
-        return struct.unpack("<i", self.data[offset: self.offset])[0]
+        try:
+            return struct.unpack("<i", self.data[offset: self.offset])[0]
+        except struct.error as e:
+            return 0
+            raise IllegalParcel(e.args[0], "data[0x{:x}:0x{:x}] : {}".format(offset, self.offset, self.data[offset:self.offset].encode("hex")))
+
+    def readInt64(self):
+        offset = self.offset
+        self.offset += 8
+        try:
+            return struct.unpack("<i", self.data[offset: self.offset])[0]
+        except struct.error as e:
+            return 0
+            raise IllegalParcel(e.args[0], "data[0x{:x}:0x{:x}] : {}".format(offset, self.offset, self.data[offset:self.offset].encode("hex")))
+
+    def readFloat(self):
+        offset = self.offset
+        self.offset += 4
+        try:
+            return struct.unpack("<f", self.data[offset: self.offset])[0]
+        except struct.error as e:
+            return 0
+            raise IllegalParcel(e.args[0], "data[0x{:x}:0x{:x}] : {}".format(offset, self.offset, self.data[offset:self.offset].encode("hex")))
+
+    def readBundle(self):
+        length = self.readInt()
+        return "Bundle Object"
         
     def readString(self):
-        return self.readString16()
+        result = self.readString16()
+        if  len(result) == 0:
+            result = ""
+        return result
+
+    def readStringArray(self):
+        length = self.readInt()
+        if  0 <= length:
+            return [self.readString() for i in range(length)]
+        else:
+            return None
 
     def readString16(self):
         length = self.readInt32()
+        if  length == 0:
+            return ""
+        length += 1
         offset = self.offset
         self.offset += length*2
-        #return self.data[offset: self.offset]
-        return ''.join([i if 31 < ord(i) < 127 else '' for i in self.data[offset: self.offset]])
+        self.offset = (self.offset + 3) &~ 3
+        if  self.offset > len(self.data):
+            raise IllegalParcel("Offset out of bound.", "from offset: 0x{:x}, get length: {}, become: {}".format(offset, length, self.offset))
+        return self.data[offset: self.offset].decode("utf16").encode("utf8").strip("\x00")
 
     def getDescriptor(self):
         try:
@@ -48,22 +94,48 @@ class Parcel(object):
         except struct.error as e:
             raise IllegalParcel(e)
         return ''.join([i if 31 < ord(i) < 127 else '' for i in self.data[8: 8+length*2]])
-    
+
+    def createIntArray(self):
+        length = self.readInt()
+        if  0 <= length and length <= (( len(self.data) - self.offset) / 4):
+            return [self.readInt() for i in range(length)]
+        else:
+            return None
+
+    def createTypedArrayList(self, creator):
+        raise NoneImplementFunction(inspect.stack()[1][3])
+        """TODO """
+        return None
+
+
     def __str__(self):
-        return ''.join([i if 31 < ord(i) < 127 else '.' for i in self.data])
+        return self.hexdump()
 
     def __repr__(self):
         return "'<Parcel Object: " + ''.join([i if 31 < ord(i) < 127 else '' for i in self.data]) + ">'"
+
+    def hexdump(self, length=32):
+        src = self.data
+        FILTER = ''.join([(len(repr(chr(x))) == 3) and chr(x) or '.' for x in range(256)])
+        lines = []
+        lines.append("    " + " ".join(["%02x" % x for x in range(32)]) + "\n")
+        for c in xrange(0, len(src), length):
+            chars = src[c:c+length]
+            hex = ' '.join(["%02x" % ord(x) for x in chars])
+            printable = ''.join(["%s" % ((ord(x) <= 127 and FILTER[ord(x)]) or '.') for x in chars])
+            lines.append("%04x  %-*s  %s\n" % (c, length*3, hex, printable))
+        return ''.join(lines)
         
 class IllegalParcel(Exception):
     pass
 
+class NoneImplementFunction(Exception):
+    pass
+
 if __name__ == '__main__':
     #hex = "870b00002000000061006e00640072006f00690064002e006e00650074002e0049004e006500740077006f0072006b0053007400610074007300530065007200760069006300650000000000"
-    hex = "2000000061006600640072006f00690064002e006e00650074002e0049004e006500740077006f0072006b0053007400610074007300530065007200760069006300650000000000"
+    hex = "2000000061007200640072006f00690064002e006e00650074002e0049004e006500740077006f0072006b0053007400610074007300530065007200760069006300650000000000"
     p = Parcel(hex)
-    print p
+    print p.hexdump()
     id = p.readString16()
-    print
-    if  id is "afdroid.net.INetworkStatsService".encode("utf8"):
-        print id
+    print id

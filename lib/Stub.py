@@ -9,6 +9,7 @@ class Stub(object):
         to
         _arg0 = self.creatorResolver("android.media.AudioAttributes", data)
         """
+        raise CallCreator
         creator = args[0]
         return "creator of [{}]".format(creator)
 
@@ -22,4 +23,6 @@ class Stub(object):
 
     def callFunction(self, *args, **kargs):
         return args
-        
+       
+class CallCreator(Exception):
+    pass

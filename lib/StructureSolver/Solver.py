@@ -3,6 +3,8 @@ import os
 import sys
 
 from StubLoader import StubLoader
+import lib.Parcel as Parcel
+import lib.Stub   as Stub
 
 logger = logging.getLogger(__name__)
 
@@ -17,15 +19,27 @@ class Solver(object):
 
         logger.debug("Solve [{}]/{} ".format(descriptor, code))
         onTransact = self.sLoader.stubs[descriptor].onTransact
-        return onTransact(code, data, "")
+        try:
+            return onTransact(code, data, "")
+        except Parcel.IllegalParcel as e:
+            print descriptor, code
+            print data
+            logger.warn(e)
+            exit()
+        except Parcel.NoneImplementFunction as e:
+            logger.warn(e)
+        except Stub.CallCreator:
+            print " #!! Call creator (Cant resolved) !!#"
 
 class NoDescriptorModule(Exception):
     pass
-        
+
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG)
+    """
     path = os.path.abspath(os.path.join(os.path.dirname(os.path.realpath(__file__)), "../../"))
     os.chdir(path)
     sys.path.append(path)
+    """
     Solver("Stub")

@@ -15,7 +15,7 @@ import tools.Config as Config
 
 def finder():
     """entry function"""
-    path = os.path.join(Config.Path.PROJECT, 'sample', 'kmsg.short')
+    path = os.path.join(Config.Path.PROJECT, 'sample', 'kmsg')
     fd = open(path, "r")
     sys_log = Parse.Parser(fd)
 
@@ -45,11 +45,10 @@ def finder():
             except Transaction.TransactionError as e:
                 logger.warn("transaction error: " + e.args[0])
 
-    tManager.dump()
-
     #pTable.dumpTable()
 
 if __name__ == '__main__':
-    logging.basicConfig(level = logging.DEBUG)
+    #logging.basicConfig(level = logging.DEBUG)
+    logging.basicConfig(level = logging.INFO)
     logger = logging.getLogger(__name__)
     finder()

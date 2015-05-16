@@ -50,7 +50,24 @@ class TransactionManager(object):
         except ProcessTable.NoneExistPid:
             setattr(transaction, "to_proc_name", "[????]")
         self.transactions.append(transaction)
+        self.solve(transaction)
 
+    def solve(self, tra):
+        if  tra.type == "BC_TRANSACTION":
+            try:
+                descriptor = tra.parcel.getDescriptor()
+            except Parcel.IllegalParcel as e:
+                logger.info(tra)
+                logger.warn(e.args[0])
+                return
+
+            if  descriptor in hardwareDescriptors:
+                return
+            try:
+                code = self.iLoader.getCode(descriptor, tra.code)
+                print self.sSolver.solve(descriptor, code, tra.parcel)
+            except InterfaceLoader.NoneExistCode as e:
+                logger.warn("missed transaction {}[{}]".format(descriptor, tra.code))
 
     def dump(self):
         for tra in self.transactions:
@@ -73,6 +90,7 @@ class TransactionManager(object):
                     continue
                 try:
                     code = self.iLoader.getCode(descriptor, tra.code)
+
                     print self.sSolver.solve(descriptor, code, tra.parcel)
                     """
                     formater = {

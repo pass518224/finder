@@ -37,7 +37,4 @@ class StubLoader(object):
 if __name__ == '__main__':
     logging.basicConfig(level = logging.DEBUG)
 
-    path = os.path.abspath(os.path.join(os.path.dirname(os.path.realpath(__file__)), "../../"))
-    os.chdir(path)
-    sys.path.append(path)
     sloader = StubLoader("Stubs")

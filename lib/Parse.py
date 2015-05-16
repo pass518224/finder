@@ -20,6 +20,7 @@ class Parser(Iterator):
         self._write_read = "WRITE_READ"
         self._bc_transaction = "BC_TRANSACTION"
         self._bc_reply = "BC_REPLY"
+        self.lineno = 0
 
     def next(self):
         """
@@ -32,6 +33,7 @@ class Parser(Iterator):
 
         while True:
             raw = self.fd.readline()[:-1];
+            self.lineno += 1
             if len(raw) is 0:   #EOF catched
                 self.fd.close()
                 raise StopIteration
@@ -91,6 +93,9 @@ class Parser(Iterator):
     def getInfo(self):
         """get Parsed object"""
         return self.info
+    
+    def getDebug(self):
+        return {"raw" : self.raw, "lineno" : self.lineno}
 
 def infoCreator(raw_info):
     """
@@ -112,8 +117,8 @@ def infoCreator(raw_info):
 
 if __name__ == '__main__':
     logging.basicConfig(level = logging.DEBUG)
-    with open("/home/lucas/Downloads/syslog/kmsg.sample", "r") as fd:
+    with open("sample/kmsg.short", "r") as fd:
         p = Parser(fd)
         for flag in p:
-            pass
+            print p.getDebug()
     
