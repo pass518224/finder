@@ -571,10 +571,14 @@ class InterfaceResolver(Compiler):
         #extends=<type 'list'>
         #type_parameters=<type 'list'>
         self.p("class {}:\n".format(name))
+        self.p("    pass\n")
         self.indent(name)
         for comp in body.body:
             self.solver(comp)
         self.unindent()
+        
+    def ClassDeclaration(self, body):
+        return
 
     def FieldDeclaration(self, body):
         mtype = self.solver(body.type)
@@ -582,7 +586,7 @@ class InterfaceResolver(Compiler):
         for var in body.variable_declarators:
             if  type(var.initializer) == plyj.Literal:
                 variable, initializer = self.solver(var)
-                self.p("    {} = {}\n".format(variable, initializer))
+                self.p("{} = {}\n".format(variable, initializer))
 
     def MethodDeclaration(self, body):
         name = self.solver(body.name)
@@ -634,7 +638,8 @@ if __name__ == '__main__':
     creators = set()
 
     
-    inputPath = os.path.join(Config.Path._IINTERFACE, "IMountService.java")
+    """
+    inputPath = os.path.join(Config.Path._IINTERFACE, "IAccessibilityInteractionConnection.java")
     #inputPath = os.path.join(Config.Path._NATIVE_STUB, Config.System.VERSION, "ServiceManagerNative.java")
     with open(inputPath, "r") as inputFd:
         translator(inputFd, sys.stdout)
@@ -668,4 +673,3 @@ if __name__ == '__main__':
                 os.remove(outputFile)
                 logger.warn("Not Found stub in file. # remove '{}'".format(file))
     print creators
-    """
