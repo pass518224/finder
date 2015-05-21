@@ -5,7 +5,6 @@ logger = logging.getLogger(__name__)
 
 class VariableManager(object):
     def __init__(self):
-        logger.debug("asklfjasdkljasjf")
         globalScope = self.Scope("__global__", "__global__")
         self.vTable = globalScope
         self.path = [globalScope]
@@ -13,9 +12,12 @@ class VariableManager(object):
 
     def newScope(self, body):
         unit = body.__class__.__name__
-        if  type(body) == plyj.ClassDeclaration or type(body) == plyj.InterfaceDeclaration or type(body) == plyj.MethodDeclaration:
-            logger.debug(">>>>>> {}".format(unit))
+        if  (type(body) == plyj.ClassDeclaration or
+        type(body) == plyj.InterfaceDeclaration or
+        type(body) == plyj.MethodDeclaration or
+        type(body) == plyj.ConstructorDeclaration):
             name = body.name
+            logger.debug(">>>>>> {}::{}".format(unit, name))
             localScope = self.Scope(name, unit)
             self.pointer.newVariable(name, localScope)
             self.pointer = localScope
@@ -23,13 +25,17 @@ class VariableManager(object):
 
     def leaveScope(self, body):
         unit = body.__class__.__name__
-        if  type(body) == plyj.ClassDeclaration or type(body) == plyj.InterfaceDeclaration or type(body) == plyj.MethodDeclaration:
-            logger.debug("<<<<<< {}".format(unit))
+        if  (type(body) == plyj.ClassDeclaration or
+        type(body) == plyj.InterfaceDeclaration or
+        type(body) == plyj.MethodDeclaration or
+        type(body) == plyj.ConstructorDeclaration):
+            name = body.name
+            logger.debug("<<<<<< {}::{}".format(unit, name))
             del self.path[-1]
             self.pointer = self.path[-1]
 
     def newVariable(self, name, type):
-        logger.debug(">>>{}<<< {} {}".format(self.pointer, type, name))
+        logger.debug(" {}: \033[1;31m{} \033[0m{}".format(" > ".join(str(i) for i in self.path), type, name))
         self.pointer.newVariable(name, type)
 
     def isExist(self, name):

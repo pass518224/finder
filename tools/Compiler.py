@@ -7,13 +7,13 @@ import os
 import json
 import random
 import string
+import inspect
 
 from VariableManager import VariableManager
 
 import Config
 
 logger = logging.getLogger(__name__)
-
 
 class Compiler(object):
     """Java to Python compiler"""
@@ -51,7 +51,8 @@ class Compiler(object):
                     "or"    : "_or",
                     "false" : "False",
                     "true"  : "True",
-                    "String"  : "str()",
+                    "String"  : "str",
+                    "Integer"  : "int",
                 }
             if  _result in reservedWord:
                 _result = reservedWord[_result]
@@ -199,10 +200,13 @@ class Compiler(object):
         if  not functionName:
             functionName = self.solver(body.name)
 
-        self.p("def {}{}{}({}):\n".format(functionName, "__" if appendName else "", "_".join(args_type) if appendName else "", ", ".join(args)))
+        self.level -= 1
+        self.p("def {}{}{}({}):\n".format(functionName,
+            "__" if appendName else "",
+            "_______".join(args_type) if appendName else "",
+            ", ".join(args)))
+        self.level += 1
 
-        for arg in body.parameters:
-            name, mtype = self.solver(arg)
         if  len(body.body) == 0:
             self.p("pass\n")
         for stmt in body.body:
@@ -302,8 +306,16 @@ class Compiler(object):
 
     @itemFilter
     def Name(self, body):
-        return body.value
-
+        curframe = inspect.currentframe()
+        calframe = inspect.getouterframes(curframe, 2)
+        caller = calframe[3][3]
+        value = body.value
+        if  caller == "Type" :
+            return value
+        if  not self.vManager.isLocal(value):
+            return "self." + value
+        return value
+        
     @itemFilter
     def Literal(self, body):
         value = body.value
@@ -503,7 +515,8 @@ def dumper(body, stop = False):
 if __name__ == '__main__':
     logging.basicConfig(level = logging.DEBUG)
     
-    inputPath = "/Users/lucas/Downloads/PackageInfo.java"
+    #inputPath = "/Users/lucas/Downloads/PackageInfo.java"
+    inputPath = "/Volumes/android/sdk-source-5.1.1_r1/frameworks/base/core/java/android/content/pm/PackageInfo.java"
     with open(inputPath, "r") as inputFd:
         parser = plyj.Parser()
 
