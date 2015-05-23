@@ -48,14 +48,23 @@ class VariableManager(object):
                 return True
         return False
 
-    def isLocal(self, name):
-        if  self.pointer.vtype == "MethodDeclaration" or self.pointer.vtype == "ConstructorDeclaration":
-            if  name in self.pointer.variables:
-                return True
-            else:
-                return False
-        else:
+    def isMember(self, name):
+        preClass = None
+        current = self.pointer
+        for scope in reversed(self.path):
+            if  scope.vtype == "ClassDeclaration":
+                preClass = scope
+                break
+        if  preClass is None:
+            return False
+        elif  name in current.variables:
+            return False
+        elif  name in preClass.variables:
             return True
+        return False
+
+    def getPath(self):
+        return ".".join(str(i) for i in self.path[1:])
 
     def dump(self):
         return json.dumps(self.vTable, indent=4)

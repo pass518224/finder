@@ -8,6 +8,8 @@ lextab.py
 parsetab.py
 parser.out
 
+#py.test framework generated
+__pycache__
 
 #vim swap
 *.swp
