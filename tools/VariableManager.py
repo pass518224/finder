@@ -1,5 +1,6 @@
 import logging
 import plyj.parser as plyj
+import JavaLib
 
 logger = logging.getLogger(__name__)
 
@@ -34,9 +35,14 @@ class VariableManager(object):
             del self.path[-1]
             self.pointer = self.path[-1]
 
-    def newVariable(self, name, type):
-        logger.debug(" {}: \033[1;31m{} \033[0m{}".format(" > ".join(str(i) for i in self.path), type, name))
-        self.pointer.newVariable(name, type)
+    def newVariable(self, name, mtype):
+        logger.debug(" {}: \033[1;31m{} \033[0m{}".format(" > ".join(str(i) for i in self.path), mtype, name))
+        if  hasattr(self, "includer") and mtype not in JavaLib.builtinMap:
+            self.includer.addType(mtype)
+        self.pointer.newVariable(name, mtype)
+
+    def setIncluder(self, includer):
+        self.includer = includer
 
     def isExist(self, name):
         pointer = self.vTable

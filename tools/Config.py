@@ -27,6 +27,7 @@ class Path(Config):
 class System(Config):
     WORKINGDIR  = path.abspath(os.getenv("ANDROID_SDK_SRC"))
     FRAMEWORK   = path.abspath(path.join(WORKINGDIR, "frameworks"))
+    JAVA_POOL   = path.abspath(path.join(WORKINGDIR, "frameworks/base/core/java/"))
     AIDL_CACHE   = path.abspath(path.join(WORKINGDIR, "out/target/common/obj/JAVA_LIBRARIES/framework_intermediates/"))
 
     manifest_root = ElementTree.parse(path.join(WORKINGDIR, '.repo/manifest.xml')).getroot()

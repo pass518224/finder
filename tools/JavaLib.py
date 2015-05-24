@@ -14,13 +14,15 @@ methodMap = {
 
 def builtinTypes(mtype):
     if  mtype in builtinMap:
-        return builtinMap[mtype]
+        return builtinMap[mtype] + "()"
     return "None"
 
 builtinMap ={
-        "int": "int()",
-        "long": "int()",
-        "String": "str()",
-        "double": "float()",
-        "float": "float()",
+        "byte": "bytes",
+        "int": "int",
+        "long": "int",
+        "String": "str",
+        "double": "float",
+        "float": "float",
+        "boolean": "bool",
 }

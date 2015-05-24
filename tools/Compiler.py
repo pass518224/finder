@@ -11,6 +11,7 @@ import inspect
 
 from VariableManager import VariableManager
 import JavaLib
+from Includer import Includer
 
 import Config
 
@@ -18,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 class Compiler(object):
     """Java to Python compiler"""
-    def __init__(self, fd = None, indent = "    ", dependencyPaths = None, vManager = None):
+    def __init__(self, fd=None, indent="    ", dependencyPaths=None, vManager=None):
         logger.debug("Create compiler with args: fd:{}, indent:<{}>, dependencyPaths: {}>, vManager:{}".format(
             "Yes" if fd else "No", indent, dependencyPaths, "Yes" if vManager else " No"
             ))
@@ -38,6 +39,7 @@ class Compiler(object):
         self.managers = []
         self.managers.append(self.vManager)
         self.mainFunction = None
+        self.loopStack = []
 
     """ decorators """
     def itemFilter(func):
@@ -54,8 +56,6 @@ class Compiler(object):
                     "or"    : "_or",
                     "false" : "False",
                     "true"  : "True",
-                    "String"  : "str",
-                    "Integer"  : "int",
                 }
             if  _result in reservedWord:
                 _result = reservedWord[_result]
@@ -79,11 +79,17 @@ class Compiler(object):
         def enterLoop(*args, **kargs):
             self = args[0]
             body = args[1]
+            if  hasattr(self, "loopUpdate"):
+                self.loopStack.append(self.loopUpdate)
+
             if  hasattr(body, "update") and body.update:
                 self.loopUpdate = body.update
+            else:
+                self.loopUpdate = None
             result = fun(*args, **kargs)
-            if  hasattr(body, "update") and body.update:
-                del self.loopUpdate
+            del self.loopUpdate
+            if  len(self.loopStack) > 0:
+                self.loopUpdate = self.loopStack.pop()
             return result
         return enterLoop
 
@@ -97,7 +103,7 @@ class Compiler(object):
         if  self.fd is not None:
             self.fd.write(indents + fmt)
         else:
-            self.outputBuffer += self.indentPattern*(self.level) + fmt
+            self.outputBuffer += indents + fmt
 
     def indent(self, body, **kargs):
         self.level += 1
@@ -117,6 +123,16 @@ class Compiler(object):
             self.p("    import sys\n")
             self.p("    {}(sys.argv)\n".format(self.mainFunction))
         return self.outputBuffer
+
+    def compilePackage(self, root, filePath):
+        parser = plyj.Parser().parse_file(filePath)
+
+        self.includer = Includer(root, filePath)
+        self.vManager.setIncluder(self.includer)
+        result = self.compile(parser)
+        self.imports = self.includer.summary()
+            
+        return "".join(["from {} import *\n".format(pkg) for pkg in self.imports]) + result
     
     def CompilationUnit(self, body):
         package_declaration = self.solver(body.package_declaration)
@@ -129,10 +145,16 @@ class Compiler(object):
             type_declarations.append(self.solver(typer))
 
     def PackageDeclaration(self, body):
-        self.c("package " + self.solver(body.name))
+        name = self.solver(body.name)
+        if  hasattr(self, "includer"):
+            self.includer.setPackage( name)
+        self.c("package " + name)
 
     def ImportDeclaration(self, body):
-        self.c("import {}".format(self.solver(body.name)))
+        name = self.solver(body.name)
+        if  hasattr(self, "includer"):
+            self.includer.addImport(name)
+        self.c("import {}".format(name))
 
     @scoped
     def InterfaceDeclaration(self, body):
@@ -198,6 +220,9 @@ class Compiler(object):
         if  len(body.body) == 0:
             self.p("pass\n")
 
+    def ClassInitializer(self, body):
+        self.solver(body.block)
+
     def EmptyDeclaration(self, body):
         return 
 
@@ -226,6 +251,13 @@ class Compiler(object):
         setattr(body, "body", body.block)
         self._classMethodDeclaration(body, appendName, functionName="__init__")
 
+    def ConstructorInvocation(self, body):
+        """docstring for ConstructorInvocation"""
+        arguments = []
+        for arg in body.arguments:
+            arguments.append(self.solver(arg))
+        self.p("super(self.__class__, self).__init__({})\n".format(", ".join(arguments)))
+
     def MethodDeclaration(self, body, appendName = False):
         """
         name=<type 'str'>
@@ -249,12 +281,14 @@ class Compiler(object):
         args_type = []
         for arg in body.parameters:
             name, mtype = self.solver(arg)
+            if  mtype in JavaLib.builtinMap:
+                mtype = JavaLib.builtinMap[mtype]
             args.append(name)
             args_type.append(mtype)
 
         self.p("def {}{}{}({}):\n".format(functionName,
             "__" if appendName else "",
-            "_______".join(args_type) if appendName else "",
+            "__".join(args_type) if appendName else "",
             ", ".join(args)), offset = -1)
 
         if  not body.body or len(body.body) == 0:
@@ -267,6 +301,17 @@ class Compiler(object):
 
     def AnnotationDeclaration(self, body):
         return
+
+    def Throw(self, body):
+        """
+        Throw(exception=InstanceCreation(type=Type(name=Name(value='IllegalArgumentException'), type_arguments=[], enclosed_in=None, dimensions=0), type_arguments=[], arguments=[Additive(operator='+', lhs=Additive(operator='+', lhs=Literal(value='"Invalid character "'), rhs=Name(value='nibble')), rhs=Literal(value='" in hex string"'))], body=[], enclosed_in=None))
+        """
+        self.p("raise {}\n".format(self.solver(body.exception)))
+
+    @scoped
+    def Synchronized(self, body):
+        self.p("synchronized({})\n".format(body.monitor), offset=-1)
+        self.solver(body.body)
         
     @scoped
     def IfThenElse(self, body):
@@ -277,19 +322,28 @@ class Compiler(object):
         else:
             result = self.solver(body.if_true)
             self.p("{}\n".format(result)) if result else None
+        
+        pointer = body.if_false
+        while( type(pointer) == plyj.IfThenElse ):
+            predicate = self.solver(pointer.predicate)
+            self.p("elif {}:\n".format(predicate), offset=-1)
+            if  pointer.if_true == None:
+                self.p("pass\n")
+            else:
+                result = self.solver(pointer.if_true)
+                self.p("{}\n".format(result)) if result else None
+            pointer = pointer.if_false
 
-        self.p("else:\n", offset=-1)
-        if  body.if_false:
-            result = self.solver(body.if_false)
+        if  pointer:
+            self.p("else:\n", offset=-1)
+            result = self.solver(pointer)
             self.p("{}\n".format(result)) if result else None
-        else:
-            self.p("pass\n")
         return None
 
     @scoped
     def Switch(self, body):
 
-        value = body.expression.value
+        value = self.solver(body.expression)
         cases      = body.switch_cases
         self.p("for mycase in Switch({}):\n".format(value), offset=-1)
         for case in cases:
@@ -298,14 +352,18 @@ class Compiler(object):
     @scoped
     def SwitchCase(self, body):
         cases = body.cases
-        body  = body.body
 
-        self.p("if {case}:\n".format(case=" and ".join("mycase(\"" + i.value.split(".")[-1] + "\")" for i in cases)), offset=-1)
+        if  cases[0] == "default":
+            self.p("if mycase():\n", offset=-1)
+        else:
+            self.p("if {case}:\n".format(case=" and ".join("mycase(\"" + self.solver(i) + "\")" for i in cases)), offset=-1)
 
-        for comp in body:
-            self.solver(comp)
+        for comp in body.body:
+            result = self.solver(comp)
+            if  result:
+                self.p(result + "\n")
 
-    def Block(self, body, _continue=None):
+    def Block(self, body):
         stmts = body.statements
         if  len(stmts) == 0:
             self.p("pass\n")
@@ -325,8 +383,23 @@ class Compiler(object):
 
     @scoped
     @loop
+    def DoWhile(self, body):
+        self.p("while True:\n", offset=-1)
+        result = self.solver(body.body)
+        if  result:
+            self.p(result + "\n")
+        self.p("if not ({}):\n".format(self.solver(body.predicate)))
+        self.p("break\n", offset=1)
+
+    @scoped
+    @loop
     def For(self, body):
-        self.p(self.solver(body.init) + "\n", offset =-1) if body.init else ""
+        if body.init:
+            if  type(body.init) == list:
+                for init in body.init:
+                    self.p(self.solver(init) + "\n", offset =-1)
+            else:
+                self.p(self.solver(body.init) + "\n", offset =-1)
         self.p("while {}:\n".format(self.solver(body.predicate) if body.predicate else "True") , offset=-1)
         self.solver(body.body)
         if  not body.update:
@@ -359,7 +432,20 @@ class Compiler(object):
         # Assignment(operator='=', lhs=Name(value='_arg1'), rhs=MethodInvocation(name='readInt', arguments=[], type_arguments=[], target=Name(value='data')))
         operator = self.solver(body.operator)
         lhs = self.solver(body.lhs)
-        rhs = self.solver(body.rhs)
+        #rhs = self.solver(body.rhs)
+        try:
+            rhs=self.solver(body.rhs)
+        except ClassOverriding as e:
+            instance = e.args[0] 
+            anonymous = self.AnonymousName()
+            oClass = plyj.ClassDeclaration(anonymous, instance.body, extends=instance.type)
+            self.solver(oClass)
+            rhs = self.solver(plyj.InstanceCreation(
+                anonymous,
+                type_arguments=instance.type_arguments,
+                arguments=instance.arguments,
+                enclosed_in=instance.enclosed_in)
+                )
         if  self.stopTranslate:
             return rhs
         return "{lhs} {op} {rhs}".format(lhs = lhs, op = operator, rhs = rhs)
@@ -383,6 +469,9 @@ class Compiler(object):
         if_true = self.solver(body.if_true)
         if_false = self.solver(body.if_false)
         return "{if_true} if {predicate} else {if_false}".format(if_true=if_true, predicate=predicate, if_false = if_false)
+
+    def ClassLiteral(self, body):
+        return "{}.__class__".format(self.solver(body.type))
 
     @itemFilter
     def Name(self, body):
@@ -414,6 +503,8 @@ class Compiler(object):
         """
         variable = self.solver(body.variable)
         mtype = self.solver(body.type)
+        if  hasattr(body.type, "dimensions") and body.type.dimensions > 0:
+            mtype = "list"
         self.vManager.newVariable(variable, mtype)
         return variable, mtype
 
@@ -486,8 +577,21 @@ class Compiler(object):
         arguments = body.arguments
         args = []
         for arg in arguments:
-            _result = self.solver(arg)
+            try:
+                _result = self.solver(arg)
+            except ClassOverriding as e:
+                instance = e.args[0] 
+                anonymous = self.AnonymousName()
+                oClass = plyj.ClassDeclaration(anonymous, instance.body, extends=instance.type)
+                self.solver(oClass)
+                _result = self.solver(plyj.InstanceCreation(
+                    anonymous,
+                    type_arguments=instance.type_arguments,
+                    arguments=instance.arguments,
+                    enclosed_in=instance.enclosed_in)
+                    )
             args.append(_result)
+
 
         type_arguments = body.type_arguments
 
@@ -496,10 +600,45 @@ class Compiler(object):
         target = self.solver(body.target)
         return "{target}.{name}({args})".format(target = target, name = name, args = ", ".join(args))
 
+    def Wildcard(self, body):
+        return 
+
+    def InstanceOf(self, body):
+        return "isinstance({}, {})".format(self.solver(body.lhs), self.solver(body.rhs))
+
     def ConditionalOr(self, body):
         lhs = self.solver(body.lhs)
         rhs = self.solver(body.rhs)
         return "({} or {})".format(lhs, rhs)
+
+    def ConditionalAnd(self, body):
+        lhs = self.solver(body.lhs)
+        rhs = self.solver(body.rhs)
+        return "({} and {})".format(lhs, rhs)
+
+    def And(self, body):
+        operator = self.solver(body.operator)
+        lhs = self.solver(body.lhs)
+        rhs = self.solver(body.rhs)
+        return "({} {} {})".format(lhs, operator, rhs)
+
+    def Or(self, body):
+        operator = self.solver(body.operator)
+        lhs = self.solver(body.lhs)
+        rhs = self.solver(body.rhs)
+        return "({} {} {})".format(lhs, operator, rhs)
+
+    def Xor(self, body):
+        operator = self.solver(body.operator)
+        lhs = self.solver(body.lhs)
+        rhs = self.solver(body.rhs)
+        return "({} {} {})".format(lhs, operator, rhs)
+
+    def Multiplicative(self, body):
+        operator = self.solver(body.operator)
+        lhs = self.solver(body.lhs)
+        rhs = self.solver(body.rhs)
+        return "({} {} {})".format(lhs, operator, rhs)
     
     def Equality(self, body):
         operator = self.solver(body.operator)
@@ -528,6 +667,8 @@ class Compiler(object):
         expression = self.solver(body.expression)
         if  sign == "x++":
             return "{} += 1".format(expression)
+        elif  sign == "x--":
+            return "{} -= 1".format(expression)
         return "{}{}".format(sign, expression)
 
     def Shift(self, body):
@@ -537,7 +678,7 @@ class Compiler(object):
         return "({} {} {})".format(lhs, operator, rhs)
 
     def Cast(self, body):
-        return
+        return "{}({})".format(self.solver(body.target), self.solver(body.expression))
 
     def ArrayInitializer(self, body):
         return "[{}]".format(", ".join(self.solver(i) for i in body.elements))
@@ -545,13 +686,10 @@ class Compiler(object):
     def ArrayCreation(self, body):
         # ArrayCreation(type='int', dimensions=[Name(value='_arg4_length')], initializer=None)
         mtype = self.solver(body.type)
-        builtinTypes = ["String", "int"]
-        if  mtype in builtinTypes:
-            mtype = ""
         dims = []
         for dim in body.dimensions:
             dims.append(self.solver(dim))
-        dimensions = "".join("[None for _i in range({})]".format(i) for i in dims)
+        dimensions = "".join("[{}()]*{}".format(mtype, i) for i in dims)
         initializer = body.initializer
         return "{dimensions} # {type}".format(type = mtype, dimensions = dimensions)
     
@@ -588,16 +726,8 @@ class NotFound(Exception):
 class Continue(Exception):
     pass
 
-class ClassName(object):
-    """docstring for ClassName"""
-    def __init__(self, arg):
-        super(ClassName, self).__init__()
-        self.arg = arg
-        
-
 class ClassOverriding(Exception):
     pass
-
 
 
 def dumper(body, stop = False):
@@ -606,24 +736,25 @@ def dumper(body, stop = False):
             print "{}={}".format(attr, type(getattr(body, attr)))
     else:
         print body
-
     if  stop:
         print "end"
         exit()
 
 if __name__ == '__main__':
     logging.basicConfig(level = logging.INFO)
+    """
+    for handler in logging.root.handlers:
+        handler.addFilter(logging.Filter('Includer'))
+    """
     
     #inputPath = "/Users/lucas/Downloads/PackageInfo.java"
-    inputPath = "/Users/lucas/finder/test/testcases/While0.java"
+    root = "/Volumes/android/sdk-source-5.1.1_r1/frameworks/base/core/java"
+    #inputPath = "/Volumes/android/sdk-source-5.1.1_r1/frameworks/base/core/java/android/content/pm/PackageInfo.java"
+    inputPath = "/Volumes/android/sdk-source-5.1.1_r1/frameworks/base/core/java/android/view/View.java"
     with open(inputPath, "r") as inputFd:
-        parser = plyj.Parser()
-
-        root = parser.parse_file(inputFd)
+        """
         compiler = Compiler(sys.stdout)
-        compiler.compile(root)
+        compiler.compilePackage(root, inputPath)
         """
-        with open("output.py", "w") as outputFd:
-            compiler = Compiler(outputFd)
-            compiler.compile(root)
-        """
+        compiler = Compiler(sys.stdout)
+        compiler.compile(plyj.Parser().parse_file(inputPath))
