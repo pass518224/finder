@@ -8,6 +8,7 @@ import json
 import random
 import string
 import inspect
+import re
 
 from VariableManager import VariableManager
 import JavaLib
@@ -49,13 +50,27 @@ class Compiler(object):
         def replaceReservedWord(*args, **kargs):
             _result = func(*args, **kargs)
             reservedWord = {
-                    "null"  : "None",
-                    "is"    : "_is",
-                    "and"   : "_and",
-                    "not"   : "_not",
-                    "or"    : "_or",
-                    "false" : "False",
-                    "true"  : "True",
+                    "null"    : "None",
+                    "is"      : "_is",
+                    "del"     : "_del",
+                    "from"    : "_from",
+                    "as"      : "_as",
+                    "elif"    : "_elif",
+                    "global"  : "_global",
+                    "with"    : "_with",
+                    "pass"    : "_pass",
+                    "yield"   : "_yield",
+                    "except"  : "_except",
+                    "print"   : "_print",
+                    "raise"   : "_raise",
+                    "def"     : "_def",
+                    "lambda"  : "_lambde",
+                    "in"      : "_in",
+                    "and"     : "_and",
+                    "not"     : "_not",
+                    "or"      : "_or",
+                    "false"   : "False",
+                    "true"    : "True",
                 }
             if  _result in reservedWord:
                 _result = reservedWord[_result]
@@ -255,7 +270,8 @@ class Compiler(object):
         """docstring for ConstructorInvocation"""
         arguments = []
         for arg in body.arguments:
-            arguments.append(self.solver(arg))
+            sArg = self.solver(arg)
+            arguments.append(sArg)
         self.p("super(self.__class__, self).__init__({})\n".format(", ".join(arguments)))
 
     def MethodDeclaration(self, body, appendName = False):
@@ -268,6 +284,56 @@ class Compiler(object):
         abstract=<type 'bool'>
         """
         self._classMethodDeclaration(body, appendName)
+
+    @scoped
+    def EnumDeclaration(self, body):
+        name = self.solver(body.name)
+        self.p("class {}:\n".format(name), offset =-1)
+
+        for stmt in body.body:
+            if  type(stmt) == plyj.EnumConstant:
+                self.solver(stmt)
+
+    def EnumConstant(self, body):
+        name = self.solver(body.name)
+        self.p("{name} = \"{name}\"\n".format(name=name))
+
+
+    """
+    @scoped
+    def EnumDeclaration(self, body):
+        name = self.solver(body.name)
+        self.p("class {}:\n".format(name), offset =-1)
+
+        declarations = []
+        for stmt in body.body:
+            if  type(stmt) != plyj.EnumConstant:
+                declarations.append(stmt)
+            else:
+                self.solver(stmt)
+        self.EnumAction(declarations)
+
+    @scoped
+    def EnumAction(self, implements):
+        self.p("class absAction:\n", offset=-1)
+        self.p("def setName(name)\n")
+        self.p("self.name = name\n", offset=+1)
+        self.p("def __str__()\n")
+        self.p("return self.name\n", offset=+1)
+        self.p("class _action(absAction):\n", offset=-1)
+        if  len(implements) == 0:
+            self.p("pass\n")
+        else:
+            for impl in implements:
+                self.solver(impl)
+
+    def EnumConstant(self, body):
+        name = self.solver(body.name)
+        args = []
+        for arg in body.arguments:
+            args.append(self.solver(arg))
+        self.p("{} = _action({}).setName({})\n".format(name, ", ".join(args), name))
+    """
     
     @scoped
     def _classMethodDeclaration(self, body, appendName = False, functionName = None):
@@ -277,6 +343,8 @@ class Compiler(object):
             if  functionName == "main":
                 self.mainFunction = self.vManager.getPath()
                 self.p("@classmethod\n", offset=-1)
+            elif functionName == "toString":
+                functionName = "__str__"
         args = ["self"]
         args_type = []
         for arg in body.parameters:
@@ -356,7 +424,7 @@ class Compiler(object):
         if  cases[0] == "default":
             self.p("if mycase():\n", offset=-1)
         else:
-            self.p("if {case}:\n".format(case=" and ".join("mycase(\"" + self.solver(i) + "\")" for i in cases)), offset=-1)
+            self.p("if {case}:\n".format(case=" and ".join("mycase(" + self.solver(i) + ")" for i in cases)), offset=-1)
 
         for comp in body.body:
             result = self.solver(comp)
@@ -427,25 +495,16 @@ class Compiler(object):
 
     def Statement(self, body):
         raise Undefined
+
+    def Assert(self, body):
+        return 
     
     def Assignment(self, body):
         # Assignment(operator='=', lhs=Name(value='_arg1'), rhs=MethodInvocation(name='readInt', arguments=[], type_arguments=[], target=Name(value='data')))
         operator = self.solver(body.operator)
         lhs = self.solver(body.lhs)
         #rhs = self.solver(body.rhs)
-        try:
-            rhs=self.solver(body.rhs)
-        except ClassOverriding as e:
-            instance = e.args[0] 
-            anonymous = self.AnonymousName()
-            oClass = plyj.ClassDeclaration(anonymous, instance.body, extends=instance.type)
-            self.solver(oClass)
-            rhs = self.solver(plyj.InstanceCreation(
-                anonymous,
-                type_arguments=instance.type_arguments,
-                arguments=instance.arguments,
-                enclosed_in=instance.enclosed_in)
-                )
+        rhs=self.solver(body.rhs)
         if  self.stopTranslate:
             return rhs
         return "{lhs} {op} {rhs}".format(lhs = lhs, op = operator, rhs = rhs)
@@ -462,6 +521,8 @@ class Compiler(object):
         enclosed_in=body.enclosed_in
         dimensions=body.dimensions
         name = self.solver(body.name)
+        if  name in JavaLib.builtinMap:
+            name = JavaLib.builtinMap[name]
         return "{name}{targs}".format(name = name, targs = type_arguments )
 
     def Conditional(self, body):
@@ -488,6 +549,8 @@ class Compiler(object):
     @itemFilter
     def Literal(self, body):
         value = body.value
+        if  re.match(r'[\d\.]+f$', value):
+            value = str(float(value[:-1]))
         return value
 
     @itemFilter
@@ -503,9 +566,9 @@ class Compiler(object):
         """
         variable = self.solver(body.variable)
         mtype = self.solver(body.type)
+        self.vManager.newVariable(variable, mtype)
         if  hasattr(body.type, "dimensions") and body.type.dimensions > 0:
             mtype = "list"
-        self.vManager.newVariable(variable, mtype)
         return variable, mtype
 
     def InstanceCreation(self, body):
@@ -522,7 +585,10 @@ class Compiler(object):
         for arg in body.arguments:
             args.append(self.solver(arg))
         if  len(body.body) > 0: # anonymous function
-            raise ClassOverriding(body)
+            anonymous = self.AnonymousName()
+            oClass = plyj.ClassDeclaration(anonymous, body.body, extends=body.type)
+            initializer = plyj.InstanceCreation( anonymous, type_arguments=body.type_arguments, arguments=body.arguments, enclosed_in=body.enclosed_in)
+            raise ClassOverriding(oClass, initializer)
         else:
             return "{}{}({})".format("self." if self.vManager.isMember(mtype) else "", mtype, ", ".join(args))
 
@@ -555,49 +621,34 @@ class Compiler(object):
         return "{name}".format(name = ", ".join(i for i in variables))
 
     def VariableDeclarator(self, body):
-        try:
-            variable=self.solver(body.variable)
-            initializer = self.solver(body.initializer)
-        except ClassOverriding as e:
-            instance = e.args[0] 
-            anonymous = self.AnonymousName()
-            oClass = plyj.ClassDeclaration(anonymous, instance.body, extends=instance.type)
-            self.solver(oClass)
-            initializer = self.solver(plyj.InstanceCreation(
-                anonymous,
-                type_arguments=instance.type_arguments,
-                arguments=instance.arguments,
-                enclosed_in=instance.enclosed_in)
-                )
+        variable=self.solver(body.variable)
+        initializer = self.solver(body.initializer)
         return variable, initializer
 
     @JavaLib.method
     def MethodInvocation(self, body):
         name = body.name
+        if  name == "toString":
+            name = "__str__"
         arguments = body.arguments
         args = []
         for arg in arguments:
-            try:
-                _result = self.solver(arg)
-            except ClassOverriding as e:
-                instance = e.args[0] 
-                anonymous = self.AnonymousName()
-                oClass = plyj.ClassDeclaration(anonymous, instance.body, extends=instance.type)
-                self.solver(oClass)
-                _result = self.solver(plyj.InstanceCreation(
-                    anonymous,
-                    type_arguments=instance.type_arguments,
-                    arguments=instance.arguments,
-                    enclosed_in=instance.enclosed_in)
-                    )
+            _result = self.solver(arg)
             args.append(_result)
 
 
         type_arguments = body.type_arguments
 
         if body.target is None:
+            if  self.vManager.isMember(name):
+                name = "self." + name
             return "{name}({args})".format(name = name, args = ", ".join(args))
+        
         target = self.solver(body.target)
+        if target.startswith("this."):
+            target = "self." + target[5:]
+        elif self.vManager.isMember(target.split(".")[0]):
+            target = "self." + target
         return "{target}.{name}({args})".format(target = target, name = name, args = ", ".join(args))
 
     def Wildcard(self, body):
@@ -669,6 +720,8 @@ class Compiler(object):
             return "{} += 1".format(expression)
         elif  sign == "x--":
             return "{} -= 1".format(expression)
+        elif    sign == "!":
+            return "not {}".format(expression)
         return "{}{}".format(sign, expression)
 
     def Shift(self, body):
@@ -679,6 +732,9 @@ class Compiler(object):
 
     def Cast(self, body):
         return "{}({})".format(self.solver(body.target), self.solver(body.expression))
+
+    def Empty(self, body):
+        return "pass"
 
     def ArrayInitializer(self, body):
         return "[{}]".format(", ".join(self.solver(i) for i in body.elements))
@@ -703,7 +759,12 @@ class Compiler(object):
             return thing
         if  type(thing) == str:
             return thing
-        return getattr(self, thing.__class__.__name__)(thing, **kargs)
+
+        try:
+            return getattr(self, thing.__class__.__name__)(thing, **kargs)
+        except ClassOverriding as e:
+            oClass = self.solver(e.args[0])
+            return self.solver(e.args[1])
 
     def AnonymousName(self, length = 16):
         return ''.join(random.choice(string.lowercase) for i in range(length))
@@ -741,20 +802,20 @@ def dumper(body, stop = False):
         exit()
 
 if __name__ == '__main__':
-    logging.basicConfig(level = logging.INFO)
-    """
+    logging.basicConfig(level = logging.DEBUG)
     for handler in logging.root.handlers:
         handler.addFilter(logging.Filter('Includer'))
-    """
     
     #inputPath = "/Users/lucas/Downloads/PackageInfo.java"
     root = "/Volumes/android/sdk-source-5.1.1_r1/frameworks/base/core/java"
-    #inputPath = "/Volumes/android/sdk-source-5.1.1_r1/frameworks/base/core/java/android/content/pm/PackageInfo.java"
-    inputPath = "/Volumes/android/sdk-source-5.1.1_r1/frameworks/base/core/java/android/view/View.java"
+    inputPath = "/Users/lucas/finder/test/testcases/InstanceCreation2.java"
+    #inputPath = "/Volumes/android/sdk-source-5.1.1_r1/frameworks/base/core/java/android/text/style/LeadingMarginSpan.java"
     with open(inputPath, "r") as inputFd:
+        #compiler = Compiler(sys.stdout)
         """
-        compiler = Compiler(sys.stdout)
+        compiler = Compiler()
         compiler.compilePackage(root, inputPath)
         """
         compiler = Compiler(sys.stdout)
+        #compiler = Compiler()
         compiler.compile(plyj.Parser().parse_file(inputPath))

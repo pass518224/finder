@@ -22,6 +22,7 @@ builtinMap ={
         "int": "int",
         "long": "int",
         "String": "str",
+        "str": "str",
         "double": "float",
         "float": "float",
         "boolean": "bool",

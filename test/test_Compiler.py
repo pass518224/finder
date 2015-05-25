@@ -157,3 +157,17 @@ class TestWhile(object):
     def test_While2(self, tmpdir):
         className = "While2"
         assert javaOutput(str(tmpdir), className) == pythonOutput(str(tmpdir), className)
+
+class TestInstance(object):
+    def test_instance0(self, tmpdir):
+        className = "InstanceCreation0"
+        assert javaOutput(str(tmpdir), className) == pythonOutput(str(tmpdir), className)
+
+    def test_instance1(self, tmpdir):
+        className = "InstanceCreation1"
+        assert javaOutput(str(tmpdir), className) == pythonOutput(str(tmpdir), className)
+
+    def test_instance2(self, tmpdir):
+        className = "InstanceCreation2"
+        assert javaOutput(str(tmpdir), className) == pythonOutput(str(tmpdir), className)
+

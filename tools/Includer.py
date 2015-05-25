@@ -13,6 +13,7 @@ class Includer(object):
         
         self.includes = {}
         self.needSolve = set()
+        self.unknownTypes = set()
 
     def setPackage(self, pkgName):
         logger.debug("set pkgname: [{}]".format(pkgName))
@@ -29,18 +30,21 @@ class Includer(object):
                 self.include(cls, abspath)
         
     def addImport(self, pkg):
-        logger.debug("import {}".format(path))
+        logger.debug("import {}".format(pkg))
         cls = pkg.split(".")[-1]
         abspath = absjoin(self.root, pkg.replace(".", "/") + ".java")
         self.include(cls, pkg2path(self.root, pkg))
 
     def addType(self, mtype):
         mtype = mtype.split(".")[0]
-        if  mtype in self.includes:
+        if  mtype in self.includes and mtype not in self.needSolve:
             logger.debug("add class: {}".format(mtype))
             self.needSolve.add(mtype)
+        elif mtype in self.unknownTypes:
+            pass
         else:
-            logger.warn("Not included type: {}".format(mtype))
+            self.unknownTypes.add(mtype)
+            #logger.warn("Not included type: {}".format(mtype))
             #raise NonIncludeClass("type: {}".format(mtype))
 
     def summary(self):

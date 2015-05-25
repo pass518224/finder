@@ -22,7 +22,7 @@ if __name__ == '__main__':
     result = compiler.compilePackage(source, file)
     imports = compiler.imports
 
-    targetFile = path.join(out, path.relpath(file, source))
+    targetFile = path.join(out, path.relpath(file, source)).replace(".java", ".py")
     targetDir = path.dirname(targetFile)
 
     if not os.path.exists(targetDir):
@@ -46,7 +46,7 @@ if __name__ == '__main__':
 
             file = Includer.pkg2path(source, pkg)
 
-            targetFile = path.join(out, path.relpath(file, source))
+            targetFile = path.join(out, path.relpath(file, source)).replace(".java", ".py")
             targetDir = path.dirname(targetFile)
             
             if  os.path.isfile(targetFile):
