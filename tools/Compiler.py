@@ -9,6 +9,7 @@ import random
 import string
 import inspect
 import re
+import keyword
 
 from VariableManager import VariableManager
 import JavaLib
@@ -28,7 +29,6 @@ class Compiler(object):
         self.outputBuffer = ""
         self.indentPattern = indent
         self.level = 0
-        self.stopTranslate = False
         self.dependencyPaths = dependencyPaths
         self.interfaceCache = {}
 
@@ -41,6 +41,7 @@ class Compiler(object):
         self.managers.append(self.vManager)
         self.mainFunction = None
         self.loopStack = []
+        self.deferExpression = []
 
     """ decorators """
     def itemFilter(func):
@@ -51,29 +52,13 @@ class Compiler(object):
             _result = func(*args, **kargs)
             reservedWord = {
                     "null"    : "None",
-                    "is"      : "_is",
-                    "del"     : "_del",
-                    "from"    : "_from",
-                    "as"      : "_as",
-                    "elif"    : "_elif",
-                    "global"  : "_global",
-                    "with"    : "_with",
-                    "pass"    : "_pass",
-                    "yield"   : "_yield",
-                    "except"  : "_except",
-                    "print"   : "_print",
-                    "raise"   : "_raise",
-                    "def"     : "_def",
-                    "lambda"  : "_lambde",
-                    "in"      : "_in",
-                    "and"     : "_and",
-                    "not"     : "_not",
-                    "or"      : "_or",
                     "false"   : "False",
                     "true"    : "True",
                 }
             if  _result in reservedWord:
                 _result = reservedWord[_result]
+            _result = args[0]._kreplace(_result)
+
             """docstring for replaceReservedWord"""
             return _result
         return replaceReservedWord
@@ -117,8 +102,14 @@ class Compiler(object):
         indents =  self.indentPattern * (self.level + offset)
         if  self.fd is not None:
             self.fd.write(indents + fmt)
+            while( self.deferExpression):
+                indents =  self.indentPattern * (self.level)
+                self.fd.write(indents + self.deferExpression.pop())
         else:
             self.outputBuffer += indents + fmt
+            while( self.deferExpression):
+                indents =  self.indentPattern * (self.level)
+                self.outputBuffer += indents + self.deferExpression.pop()
 
     def indent(self, body, **kargs):
         self.level += 1
@@ -129,6 +120,12 @@ class Compiler(object):
         self.level -= 1
         for manager in self.managers:
             manager.leaveScope(body, **kargs)
+
+    def _kreplace(self, string):
+        """keyword replacement"""
+        strs = string.split(".")
+        strs = map(lambda i: "_" + i if keyword.iskeyword(i) else i, strs)
+        return ".".join(strs)
 
     def compile(self, body):
         """ entry function """
@@ -254,7 +251,7 @@ class Compiler(object):
             self.p("{} = {}\n".format(variable, initializer))
 
     def FieldAccess(self, body):
-        return "self.{}".format(body.name)
+        return "self.{}".format(self.solver(body.name))
 
     def ConstructorDeclaration(self, body, appendName = False):
         """
@@ -298,43 +295,6 @@ class Compiler(object):
         name = self.solver(body.name)
         self.p("{name} = \"{name}\"\n".format(name=name))
 
-
-    """
-    @scoped
-    def EnumDeclaration(self, body):
-        name = self.solver(body.name)
-        self.p("class {}:\n".format(name), offset =-1)
-
-        declarations = []
-        for stmt in body.body:
-            if  type(stmt) != plyj.EnumConstant:
-                declarations.append(stmt)
-            else:
-                self.solver(stmt)
-        self.EnumAction(declarations)
-
-    @scoped
-    def EnumAction(self, implements):
-        self.p("class absAction:\n", offset=-1)
-        self.p("def setName(name)\n")
-        self.p("self.name = name\n", offset=+1)
-        self.p("def __str__()\n")
-        self.p("return self.name\n", offset=+1)
-        self.p("class _action(absAction):\n", offset=-1)
-        if  len(implements) == 0:
-            self.p("pass\n")
-        else:
-            for impl in implements:
-                self.solver(impl)
-
-    def EnumConstant(self, body):
-        name = self.solver(body.name)
-        args = []
-        for arg in body.arguments:
-            args.append(self.solver(arg))
-        self.p("{} = _action({}).setName({})\n".format(name, ", ".join(args), name))
-    """
-    
     @scoped
     def _classMethodDeclaration(self, body, appendName = False, functionName = None):
 
@@ -356,7 +316,7 @@ class Compiler(object):
 
         self.p("def {}{}{}({}):\n".format(functionName,
             "__" if appendName else "",
-            "__".join(args_type) if appendName else "",
+            "__".join([arg.split(".")[-1] for arg in args_type] if appendName else ""),
             ", ".join(args)), offset = -1)
 
         if  not body.body or len(body.body) == 0:
@@ -376,9 +336,9 @@ class Compiler(object):
         """
         self.p("raise {}\n".format(self.solver(body.exception)))
 
-    @scoped
+    #@scoped
     def Synchronized(self, body):
-        self.p("synchronized({})\n".format(body.monitor), offset=-1)
+        #self.p("synchronized({})\n".format(body.monitor), offset=-1)
         self.solver(body.body)
         
     @scoped
@@ -391,6 +351,13 @@ class Compiler(object):
             result = self.solver(body.if_true)
             self.p("{}\n".format(result)) if result else None
         
+        if  body.if_false != None:
+            self.p("else:\n", offset=-1)
+            result = self.solver(body.if_false)
+            self.p("{}\n".format(result)) if result else None
+            
+        
+        """
         pointer = body.if_false
         while( type(pointer) == plyj.IfThenElse ):
             predicate = self.solver(pointer.predicate)
@@ -407,6 +374,7 @@ class Compiler(object):
             result = self.solver(pointer)
             self.p("{}\n".format(result)) if result else None
         return None
+        """
 
     @scoped
     def Switch(self, body):
@@ -426,6 +394,8 @@ class Compiler(object):
         else:
             self.p("if {case}:\n".format(case=" and ".join("mycase(" + self.solver(i) + ")" for i in cases)), offset=-1)
 
+        if  len(body.body) == 0:
+            self.p("pass\n")
         for comp in body.body:
             result = self.solver(comp)
             if  result:
@@ -501,12 +471,24 @@ class Compiler(object):
     
     def Assignment(self, body):
         # Assignment(operator='=', lhs=Name(value='_arg1'), rhs=MethodInvocation(name='readInt', arguments=[], type_arguments=[], target=Name(value='data')))
+        curframe = inspect.currentframe()
+        calframe = inspect.getouterframes(curframe, 2)
+        caller = calframe[2][3]
         operator = self.solver(body.operator)
         lhs = self.solver(body.lhs)
-        #rhs = self.solver(body.rhs)
-        rhs=self.solver(body.rhs)
-        if  self.stopTranslate:
-            return rhs
+        rhs = self.solver(body.rhs)
+        if  operator == ">>>=":
+            operator = "="
+            rhs = "{} >> {}".format(lhs, rhs)
+        if  caller in ['Assignment', "Equality", "Relational", "Return", "Unary", "Conditional", "IfThenElse"] :
+            frameLevel = 4
+            offset = 0
+            while calframe[frameLevel][3] in ["solver", "IfThenElse", "ForEach", "While", "DoWhile", "For", "ConditionalAnd", "ConditionalOr", "Equality"]:
+                if  calframe[frameLevel][3] in ["IfThenElse", "ForEach", "While", "DoWhile", "For"]:
+                    offset = -1
+                frameLevel += 1
+            self.p("{lhs} {op} {rhs}\n".format(lhs = lhs, op = operator, rhs = rhs), offset = offset)
+            return lhs
         return "{lhs} {op} {rhs}".format(lhs = lhs, op = operator, rhs = rhs)
 
 
@@ -529,7 +511,7 @@ class Compiler(object):
         predicate = self.solver(body.predicate)
         if_true = self.solver(body.if_true)
         if_false = self.solver(body.if_false)
-        return "{if_true} if {predicate} else {if_false}".format(if_true=if_true, predicate=predicate, if_false = if_false)
+        return "( {if_true} if {predicate} else {if_false} )".format(if_true=if_true, predicate=predicate, if_false = if_false)
 
     def ClassLiteral(self, body):
         return "{}.__class__".format(self.solver(body.type))
@@ -555,7 +537,7 @@ class Compiler(object):
 
     @itemFilter
     def Variable(self, body):
-        return body.name
+        return self.solver(body.name)
 
     def FormalParameter(self, body):
         """
@@ -609,16 +591,19 @@ class Compiler(object):
         """
         mtype = self.solver(body.type)
         variables = []
+        initializers = []
         for variable in body.variable_declarators:
             variable, initializer = self.solver(variable)
             if  variable:
                 self.vManager.newVariable(variable, mtype)
             if  initializer:
-                variables.append("{} = {}".format(variable, initializer))
+                variables.append(variable)
+                initializers.append(initializer)
             else:
-                variables.append("{} = {}".format(variable, JavaLib.builtinTypes(mtype)))
+                variables.append(variable)
+                initializers.append(JavaLib.builtinTypes(mtype))
 
-        return "{name}".format(name = ", ".join(i for i in variables))
+        return "{} = {}".format(", ".join(variables), ", ".join(initializers))
 
     def VariableDeclarator(self, body):
         variable=self.solver(body.variable)
@@ -627,9 +612,10 @@ class Compiler(object):
 
     @JavaLib.method
     def MethodInvocation(self, body):
-        name = body.name
+        name = self.solver(body.name)
         if  name == "toString":
             name = "__str__"
+
         arguments = body.arguments
         args = []
         for arg in arguments:
@@ -644,12 +630,12 @@ class Compiler(object):
                 name = "self." + name
             return "{name}({args})".format(name = name, args = ", ".join(args))
         
-        target = self.solver(body.target)
-        if target.startswith("this."):
-            target = "self." + target[5:]
-        elif self.vManager.isMember(target.split(".")[0]):
-            target = "self." + target
-        return "{target}.{name}({args})".format(target = target, name = name, args = ", ".join(args))
+        targets = self.solver(body.target).split(".")
+        if targets[0] == "this":
+            targets[0] = "self"
+        elif self.vManager.isMember(targets[0]):
+            targets.insert(0, "self")
+        return "{}.{}({})".format(".".join(self._kreplace(i) for i in targets), name, ", ".join(args))
 
     def Wildcard(self, body):
         return 
@@ -707,6 +693,8 @@ class Compiler(object):
         operator = self.solver(body.operator)
         lhs = self.solver(body.lhs)
         rhs = self.solver(body.rhs)
+        if type(body.lhs) == plyj.Literal and lhs.find("E") > 0:
+            return "{}{}{}".format(lhs, operator, rhs)
         return "({} {} {})".format(lhs, operator, rhs)
     
     def Unary(self, body):
@@ -714,8 +702,23 @@ class Compiler(object):
         sign=<type 'str'>
         expression=<class 'plyj.model.Literal'>
         """
+        curframe = inspect.currentframe()
+        calframe = inspect.getouterframes(curframe, 2)
+        caller = calframe[2][3]
         sign = body.sign
         expression = self.solver(body.expression)
+
+        if  caller not in ["Block", "IfThenElse", "While", "For", "ForEach", "DoWhile", "SwitchCase", "_classMethodDeclaration"]:
+            if  sign == "x++":
+                self.deferExpression.append("{} += 1\n".format(expression))
+            elif  sign == "x--":
+                self.deferExpression.append("{} -= 1\n".format(expression))
+            elif  sign == "++x":
+                self.p("{} += 1\n".format(expression))
+            elif sign == "--x":
+                self.p("{} -= 1\n".format(expression))
+            return expression
+
         if  sign == "x++":
             return "{} += 1".format(expression)
         elif  sign == "x--":
@@ -726,6 +729,8 @@ class Compiler(object):
 
     def Shift(self, body):
         operator = self.solver(body.operator)
+        if  operator == ">>>":
+            operator = ">>"
         lhs = self.solver(body.lhs)
         rhs = self.solver(body.rhs)
         return "({} {} {})".format(lhs, operator, rhs)
@@ -747,7 +752,8 @@ class Compiler(object):
             dims.append(self.solver(dim))
         dimensions = "".join("[{}()]*{}".format(mtype, i) for i in dims)
         initializer = body.initializer
-        return "{dimensions} # {type}".format(type = mtype, dimensions = dimensions)
+        self.c(mtype)
+        return "{dimensions}".format(dimensions = dimensions)
     
     def ArrayAccess(self, body):
         index = self.solver(body.index)
@@ -758,6 +764,10 @@ class Compiler(object):
         if  thing == None:
             return thing
         if  type(thing) == str:
+            if  thing.find("$") > 0:
+                thing = thing.replace("$", "_D")
+            return self._kreplace(thing)
+        if  type(thing) == list:
             return thing
 
         try:
@@ -808,8 +818,8 @@ if __name__ == '__main__':
     
     #inputPath = "/Users/lucas/Downloads/PackageInfo.java"
     root = "/Volumes/android/sdk-source-5.1.1_r1/frameworks/base/core/java"
-    inputPath = "/Users/lucas/finder/test/testcases/InstanceCreation2.java"
-    #inputPath = "/Volumes/android/sdk-source-5.1.1_r1/frameworks/base/core/java/android/text/style/LeadingMarginSpan.java"
+    inputPath = "/Users/lucas/Downloads/Enum0.java"
+    #inputPath = "/Volumes/android/sdk-source-5.1.1_r1/frameworks/base/core/java/android/app/EnterTransitionCoordinator.java"
     with open(inputPath, "r") as inputFd:
         #compiler = Compiler(sys.stdout)
         """

@@ -17,6 +17,7 @@ if __name__ == '__main__':
         os.mkdir(out)
 
     file = Includer.absjoin(source, "android/content/pm/PackageInfo.java")
+    #file = Includer.absjoin(source, "android/app/EnterTransitionCoordinator.java")
 
     compiler = Compiler.Compiler()
     result = compiler.compilePackage(source, file)
@@ -73,6 +74,10 @@ if __name__ == '__main__':
             with open(targetFile, "w") as targetFd:
                 targetFd.write(result)
 
+    for root, dirs, files in os.walk(out):
+        init = path.join(root, "__init__.py")
+        with open(init, 'a'):
+            os.utime(init, None)
     print imports
 
 

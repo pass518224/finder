@@ -171,3 +171,16 @@ class TestInstance(object):
         className = "InstanceCreation2"
         assert javaOutput(str(tmpdir), className) == pythonOutput(str(tmpdir), className)
 
+class TestIncrement(object):
+    def test_increment0(self, tmpdir):
+        className = "Increment0"
+        assert javaOutput(str(tmpdir), className) == pythonOutput(str(tmpdir), className)
+
+    def test_increment1(self, tmpdir):
+        className = "Increment1"
+        assert javaOutput(str(tmpdir), className) == pythonOutput(str(tmpdir), className)
+
+def test_keyword0(tmpdir):
+    className = "Keyword0"
+    assert javaOutput(str(tmpdir), className) == pythonOutput(str(tmpdir), className)
+
