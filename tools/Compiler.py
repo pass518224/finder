@@ -42,6 +42,7 @@ class Compiler(object):
         self.mainFunction = None
         self.loopStack = []
         self.deferExpression = []
+        self.inCondition = False
 
     """ decorators """
     def itemFilter(func):
@@ -343,7 +344,7 @@ class Compiler(object):
         
     @scoped
     def IfThenElse(self, body):
-        predicate = self.solver(body.predicate)
+        predicate = self.solver(body.predicate, inCondition = True)
         self.p("if {}:\n".format(predicate), offset=-1)
         if  body.if_true == None:
             self.p("pass\n")
@@ -355,26 +356,6 @@ class Compiler(object):
             self.p("else:\n", offset=-1)
             result = self.solver(body.if_false)
             self.p("{}\n".format(result)) if result else None
-            
-        
-        """
-        pointer = body.if_false
-        while( type(pointer) == plyj.IfThenElse ):
-            predicate = self.solver(pointer.predicate)
-            self.p("elif {}:\n".format(predicate), offset=-1)
-            if  pointer.if_true == None:
-                self.p("pass\n")
-            else:
-                result = self.solver(pointer.if_true)
-                self.p("{}\n".format(result)) if result else None
-            pointer = pointer.if_false
-
-        if  pointer:
-            self.p("else:\n", offset=-1)
-            result = self.solver(pointer)
-            self.p("{}\n".format(result)) if result else None
-        return None
-        """
 
     @scoped
     def Switch(self, body):
@@ -416,8 +397,13 @@ class Compiler(object):
     @scoped
     @loop
     def While(self, body):
-        self.p("while {}:\n".format(self.solver(body.predicate) if body.predicate else "True") , offset=-1)
-        self.solver(body.body)
+        self.p("while {}:\n".format(self.solver(body.predicate, inCondition=True) if body.predicate else "True") , offset=-1)
+        if  body.body:
+            result = self.solver(body.body)
+            if type(result) == str:
+                self.p(result + "\n")
+        else:
+            self.p("pass\n")
 
     @scoped
     @loop
@@ -426,7 +412,7 @@ class Compiler(object):
         result = self.solver(body.body)
         if  result:
             self.p(result + "\n")
-        self.p("if not ({}):\n".format(self.solver(body.predicate)))
+        self.p("if not ({}):\n".format(self.solver(body.predicate, inCondition=True)))
         self.p("break\n", offset=1)
 
     @scoped
@@ -438,7 +424,7 @@ class Compiler(object):
                     self.p(self.solver(init) + "\n", offset =-1)
             else:
                 self.p(self.solver(body.init) + "\n", offset =-1)
-        self.p("while {}:\n".format(self.solver(body.predicate) if body.predicate else "True") , offset=-1)
+        self.p("while {}:\n".format(self.solver(body.predicate, inCondition=True) if body.predicate else "True") , offset=-1)
         self.solver(body.body)
         if  not body.update:
             return
@@ -449,7 +435,10 @@ class Compiler(object):
     @loop
     def ForEach(self, body):
         self.p("for {} in {}:\n".format(self.solver(body.variable), self.solver(body.iterable)) , offset=-1)
-        self.solver(body.body)
+        if  body.body:
+            result = self.solver(body.body)
+            if  type(result) == str:
+                self.p(result + "\n")
 
     def Break(self, body):
         return "break"
@@ -480,15 +469,14 @@ class Compiler(object):
         if  operator == ">>>=":
             operator = "="
             rhs = "{} >> {}".format(lhs, rhs)
-        if  caller in ['Assignment', "Equality", "Relational", "Return", "Unary", "Conditional", "IfThenElse"] :
-            frameLevel = 4
+        if  self.inCondition:
+            self.p("{lhs} {op} {rhs}\n".format(lhs = lhs, op = operator, rhs = rhs), offset = -1)
+            return lhs
+        elif  caller in ['Assignment', "Equality", "Relational", "Return", "Unary", "Conditional"] :
             offset = 0
-            while calframe[frameLevel][3] in ["solver", "IfThenElse", "ForEach", "While", "DoWhile", "For", "ConditionalAnd", "ConditionalOr", "Equality"]:
-                if  calframe[frameLevel][3] in ["IfThenElse", "ForEach", "While", "DoWhile", "For"]:
-                    offset = -1
-                frameLevel += 1
             self.p("{lhs} {op} {rhs}\n".format(lhs = lhs, op = operator, rhs = rhs), offset = offset)
             return lhs
+
         return "{lhs} {op} {rhs}".format(lhs = lhs, op = operator, rhs = rhs)
 
 
@@ -508,7 +496,7 @@ class Compiler(object):
         return "{name}{targs}".format(name = name, targs = type_arguments )
 
     def Conditional(self, body):
-        predicate = self.solver(body.predicate)
+        predicate = self.solver(body.predicate, inCondition=True)
         if_true = self.solver(body.if_true)
         if_false = self.solver(body.if_false)
         return "( {if_true} if {predicate} else {if_false} )".format(if_true=if_true, predicate=predicate, if_false = if_false)
@@ -708,15 +696,20 @@ class Compiler(object):
         sign = body.sign
         expression = self.solver(body.expression)
 
-        if  caller not in ["Block", "IfThenElse", "While", "For", "ForEach", "DoWhile", "SwitchCase", "_classMethodDeclaration"]:
+        if  caller not in ["Block", "IfThenElse", "While", "For", "DoWhile", "SwitchCase", "_classMethodDeclaration"]:
+            if  self.inCondition:
+                offset = -1
+            else:
+                offset = 0
+
             if  sign == "x++":
                 self.deferExpression.append("{} += 1\n".format(expression))
             elif  sign == "x--":
                 self.deferExpression.append("{} -= 1\n".format(expression))
             elif  sign == "++x":
-                self.p("{} += 1\n".format(expression))
+                self.p("{} += 1\n".format(expression), offset=offset)
             elif sign == "--x":
-                self.p("{} -= 1\n".format(expression))
+                self.p("{} -= 1\n".format(expression), offset=offset)
             return expression
 
         if  sign == "x++":
@@ -770,11 +763,18 @@ class Compiler(object):
         if  type(thing) == list:
             return thing
 
+        oldCondition = self.inCondition
+        if  "inCondition" in kargs:
+            self.inCondition = kargs['inCondition']
+            del kargs["inCondition"]
+
         try:
-            return getattr(self, thing.__class__.__name__)(thing, **kargs)
+            result = getattr(self, thing.__class__.__name__)(thing, **kargs)
         except ClassOverriding as e:
             oClass = self.solver(e.args[0])
-            return self.solver(e.args[1])
+            result = self.solver(e.args[1])
+        self.inCondition = oldCondition
+        return result
 
     def AnonymousName(self, length = 16):
         return ''.join(random.choice(string.lowercase) for i in range(length))
@@ -818,8 +818,8 @@ if __name__ == '__main__':
     
     #inputPath = "/Users/lucas/Downloads/PackageInfo.java"
     root = "/Volumes/android/sdk-source-5.1.1_r1/frameworks/base/core/java"
-    inputPath = "/Users/lucas/Downloads/Enum0.java"
-    #inputPath = "/Volumes/android/sdk-source-5.1.1_r1/frameworks/base/core/java/android/app/EnterTransitionCoordinator.java"
+    #inputPath = "/Users/lucas/Downloads/Enum0.java"
+    inputPath = "/Volumes/android/sdk-source-5.1.1_r1/frameworks/base/core/java/android/animation/AnimatorSet.java"
     with open(inputPath, "r") as inputFd:
         #compiler = Compiler(sys.stdout)
         """
