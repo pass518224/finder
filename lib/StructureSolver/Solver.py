@@ -20,7 +20,7 @@ class Solver(object):
         logger.debug("Solve [{}]/{} ".format(descriptor, code))
         onTransact = self.sLoader.stubs[descriptor].onTransact
         try:
-            return onTransact(code, data, "")
+            return onTransact(code, data, Parcel.Parcel(""))
         except Parcel.IllegalParcel as e:
             print descriptor, code
             print data

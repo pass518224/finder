@@ -235,6 +235,9 @@ class Compiler(object):
                 if  type(comp) == plyj.FieldDeclaration:
                     self.solver(comp)
             self.p("    def onTransact(self, code, data, reply):\n")
+            self.vManager.newVariable("reply", "Parcel")
+            self.vManager.newVariable("data", "Parcel")
+            self.vManager.newVariable("code", "int")
             self.hasImplement = True
 
         self.indent(name)
@@ -410,19 +413,13 @@ class Compiler(object):
         self.vManager.newVariable(variable, mtype)
 
     def InstanceCreation(self, body):
-        """
-        InstanceCreation(
-        type=Type(name=Name(value='java.util.ArrayList'), type_arguments=[Type(name=Name(value='android.widget.RemoteViews'), type_arguments=[], enclosed_in=None, dimensions=0)], enclosed_in=None, dimensions=0),
-        type_arguments=[],
-        arguments=[],
-        body=[],
-        enclosed_in=None)
-        """
         mtype = self.solver(body.type)
+        if  mtype.find("ArrayList") > 0:
+            return "list()"
         args = []
         for arg in body.arguments:
             args.append(self.solver(arg))
-        return "{}({})".format(mtype, ", ".join(i for i in args))
+        return "self.newInstance(\"{}\", {})".format(mtype, ", ".join(i for i in args))
 
     def VariableDeclaration(self, body):
         mtype = self.solver(body.type)
@@ -495,6 +492,9 @@ class Compiler(object):
             target = target[:offset]
             args.insert(0, "\"" + target + "\"")
             return "self.interfaceResolver({args})".format(args = ", ".join(i for i in args))
+
+        if not self.vManager.isExist(target):
+            return "\'{target}.{name}({args})\'".format(target = target, name = name, args = ", ".join(i for i in args))
 
         return "{target}.{name}({args})".format(target = target, name = name, args = ", ".join(i for i in args))
     
@@ -639,7 +639,7 @@ if __name__ == '__main__':
 
     
     """
-    inputPath = os.path.join(Config.Path._IINTERFACE, "IAccessibilityInteractionConnection.java")
+    inputPath = "/Users/lucas/finder/_IINTERFACE/ICameraService.java"
     #inputPath = os.path.join(Config.Path._NATIVE_STUB, Config.System.VERSION, "ServiceManagerNative.java")
     with open(inputPath, "r") as inputFd:
         translator(inputFd, sys.stdout)

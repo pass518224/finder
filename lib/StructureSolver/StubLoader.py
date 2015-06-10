@@ -34,6 +34,9 @@ class StubLoader(object):
         logger.debug("Load in: [{}] = {}".format( descriptor, _from))
         return descriptor, instance
 
+class Property(object):
+    pass
+
 if __name__ == '__main__':
     logging.basicConfig(level = logging.DEBUG)
 

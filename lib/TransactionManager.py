@@ -65,7 +65,11 @@ class TransactionManager(object):
                 return
             try:
                 code = self.iLoader.getCode(descriptor, tra.code)
-                print self.sSolver.solve(descriptor, code, tra.parcel)
+                print "=============================="
+                print "[{}]: {}".format(descriptor, code)
+                result = self.sSolver.solve(descriptor, code, tra.parcel)
+                if  result and result != True:
+                    print "\t" + result
             except InterfaceLoader.NoneExistCode as e:
                 logger.warn("missed transaction {}[{}]".format(descriptor, tra.code))
 

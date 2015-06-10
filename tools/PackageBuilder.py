@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 import logging
 import os
 from os import path
@@ -17,6 +19,7 @@ if __name__ == '__main__':
         os.mkdir(out)
 
     file = Includer.absjoin(source, "android/content/pm/PackageInfo.java")
+    #file = Includer.absjoin(source, "android/hardware/camera2/utils/BinderHolder.java")
     #file = Includer.absjoin(source, "android/app/EnterTransitionCoordinator.java")
 
     compiler = Compiler.Compiler()
@@ -76,8 +79,25 @@ if __name__ == '__main__':
 
     for root, dirs, files in os.walk(out):
         init = path.join(root, "__init__.py")
-        with open(init, 'a'):
+        with open(init, "w") as fd:
+            pkgs = set()
+            for d in dirs:
+                fd.write("import {}\n".format(d))
+                pkgs.add(d)
+            for file in files:
+                name = file.split(".")[0]
+                if  name != "__init__":
+                    pkgs.add(name)
+            for pkg in pkgs:
+                fd.write("from {} import *\n".format(pkg))
+    """
+
+    for root, dirs, files in os.walk(out):
+        init = path.join(root, "__init__.py")
+        with open(init, 'w'):
             os.utime(init, None)
+    """
+
     print imports
 
 

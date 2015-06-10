@@ -3,15 +3,18 @@ import binascii
 import string
 import struct
 import inspect
+import base64
+
+from PersistableBundle import PersistableBundle
 
 logger = logging.getLogger(__name__)
 BYTE = 4
 
 class Parcel(object):
     """Parcel object to contain data"""
-    def __init__(self, hex):
+    def __init__(self, raw):
         super(Parcel, self).__init__()
-        self.data = binascii.unhexlify(hex)
+        self.data = base64.b64decode(raw)
         self.offset = 0
 
     def enforceInterface(self, descriptor):
@@ -25,6 +28,21 @@ class Parcel(object):
         self.offset += BYTE *4
         """ TODO """
         return None
+
+    def readPersistableBundle(self, loader=None):
+        length = self.readInt()
+        if  length < 0:
+            return null
+
+        bundle = PersistableBundle(self, length)
+        if  loader != None:
+            bundle.setClassLoader(loader)
+
+        return bundle
+
+
+    def readByte(self):
+        return self.readInt() & 0xff
 
     def readLong(self):
         return self.readInt64()
@@ -102,11 +120,30 @@ class Parcel(object):
         else:
             return None
 
+    def createStringArray(self):
+        length = self.readInt()
+        if  0 <= length:
+            return [self.readString() for i in range(length)]
+        else:
+            return None
+
     def createTypedArrayList(self, creator):
         raise NoneImplementFunction(inspect.stack()[1][3])
         """TODO """
         return None
 
+    def createTypedArray(self, creator):
+        raise NoneImplementFunction(inspect.stack()[1][3])
+        """TODO """
+        return None
+
+    """
+    reply functions
+    #! ideally, not used
+    """
+
+    def writeNoException(self):
+        return
 
     def __str__(self):
         return self.hexdump()

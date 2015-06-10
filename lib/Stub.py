@@ -21,8 +21,14 @@ class Stub(object):
         """
         return "solved interface of [{}]".format(name)
 
-    def callFunction(self, *args, **kargs):
-        return args
+    def newInstance(self, name, *args):
+        print name
+        raise CallCreator("new instance")
+        """docstring for newInstance"""
+        pass
+
+    def callFunction(self, funName, *args, **kargs):
+        return "{}({})".format(funName, ", ".join(str(i) for i in args))
        
 class CallCreator(Exception):
     pass
