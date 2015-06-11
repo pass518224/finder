@@ -107,11 +107,10 @@ class Parcel(object):
         return self.data[offset: self.offset].decode("utf16").encode("utf8").strip("\x00")
 
     def getDescriptor(self):
-        try:
-            length = struct.unpack("<i", self.data[4: 8])[0]
-        except struct.error as e:
-            raise IllegalParcel(e)
-        return ''.join([i if 31 < ord(i) < 127 else '' for i in self.data[8: 8+length*2]])
+        self.offset = 4
+        descriptor = self.readString16()
+        self.offset = 0
+        return descriptor
 
     def createIntArray(self):
         length = self.readInt()

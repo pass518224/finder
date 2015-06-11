@@ -5,6 +5,7 @@ import plyj.parser as plyj
 import sys
 import os
 import json
+from os import path
 
 import Config
 
@@ -672,4 +673,7 @@ if __name__ == '__main__':
             except NotFoundStub as e:
                 os.remove(outputFile)
                 logger.warn("Not Found stub in file. # remove '{}'".format(file))
-    print creators
+
+    parcelList = path.join( Config.Path.OUT, Config.System.VERSION, "Parcel_list")
+    with open(parcelList, "w") as pfd:
+        pfd.write("\n".join(creators))

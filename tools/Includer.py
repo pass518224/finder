@@ -18,10 +18,12 @@ class Includer(object):
     def setPackage(self, pkgName):
         logger.debug("set pkgname: [{}]".format(pkgName))
         self.pkgName = pkgName
+        """
         if self.current != absjoin(self.root, pkgName.replace(".", "/")):
             logger.warn("dirpath: [{}]".format(self.current))
             logger.warn("pkgpath: [{}]".format(absjoin(self.root, pkgName.replace(".", "/"))))
             raise WrongPackageName
+        """
         for file in os.listdir(self.current):
             if  file.endswith(".java"):
                 cls = file[:-5]
@@ -63,7 +65,7 @@ class Includer(object):
     Utilities
     """
     def include(self, cls, path):
-        logger.debug(">> include {:<30} => {}".format(cls, path))
+        logger.debug("    o {:<30} => {}".format(cls, path))
         self.includes[cls] = path
 
 def path2pkg(root, file):

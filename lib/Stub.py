@@ -3,15 +3,21 @@ class Stub(object):
     def __init__(self):
         pass
 
-    def creatorResolver(self, *args):
+    def creatorResolver(self, name, *args):
         """ function call to require creator constructor for reconstruct java object from parcel raw data
         _arg0 = android.media.AudioAttributes.CREATOR.createFromParcel(data);
         to
         _arg0 = self.creatorResolver("android.media.AudioAttributes", data)
         """
-        raise CallCreator
-        creator = args[0]
+        import sys
+        sys.path.append("/Users/lucas/finder/java")
+
+        className = name.split(".")[-1]
+        creator = __import__(name, globals(), locals(), className)
+        creator.CREATOR.createFromParcel(*args)
+
         return "creator of [{}]".format(creator)
+        raise CallCreator(args)
 
     def interfaceResolver(self, name, strongBinder):
         """ function call of 'asInterface', ex:

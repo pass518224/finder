@@ -11,6 +11,7 @@ hardwareDescriptors = [
     "android.gui.DisplayEventConnection",
     "android.ui.ISurfaceComposer",
     "android.ui.ISurfaceComposerClient",
+    "android.gui.IProducerListener",
     "android.media.IAudioFlinger",
     "android.media.IAudioFlingerClient",
     "android.media.IAudioPolicyService",
@@ -19,6 +20,7 @@ hardwareDescriptors = [
     "android.ui.IGraphicBufferAlloc",
     "android.media.IAudioTrack",
     "android.utils.IMemory",
+    "android.hardware.ISoundTriggerHwService",
     "drm.IDrmManagerService"
 ]
 

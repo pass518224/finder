@@ -174,6 +174,9 @@ class Compiler(object):
         implements = []
         for impl in body.extends:
             implements.append(self.solver(impl))
+        if  hasattr(self, "includer"):
+            for impl in implements:
+                self.includer.addType(impl)
 
         name = self.solver(body.name)
 
@@ -192,11 +195,21 @@ class Compiler(object):
         extends=<class 'plyj.model.Type'>
         implements=<type 'list'>
         """
+        for b in body.body:
+            print  type(b)
+        exit()
         implements = []
         if  body.extends:
             implements.append(self.solver(body.extends))
         for impl in body.implements:
             implements.append(self.solver(impl))
+
+        # special case: (Cloneable)
+        if  "Cloneable" in implements:
+            implements.remove("Cloneable")
+        if  hasattr(self, "includer"):
+            for impl in implements:
+                self.includer.addType(impl)
 
         name = self.solver(body.name)
 
@@ -234,6 +247,12 @@ class Compiler(object):
             self.p("pass\n")
 
     def ClassInitializer(self, body):
+        return
+        logger.info(body)
+        curframe = inspect.currentframe()
+        calframe = inspect.getouterframes(curframe, 2)
+        for i in range(2,8):
+            logger.info(calframe[i][3])
         self.solver(body.block)
 
     def EmptyDeclaration(self, body):
@@ -247,9 +266,12 @@ class Compiler(object):
             self.vManager.newVariable(variable, mtype)
             if  initializer is None:
                 self.c(mtype)
-                self.p("{} = {}\n".format(variable, JavaLib.builtinTypes(mtype)))
-                continue
-            self.p("{} = {}\n".format(variable, initializer))
+                result = "{} = {}\n".format(variable, JavaLib.builtinTypes(mtype))
+            elif not keyword.iskeyword(mtype):
+                result = "{} = {}\n".format(variable, "None")
+            else:
+                result = "{} = {}\n".format(variable, initializer)
+            self.p(result)
 
     def FieldAccess(self, body):
         return "self.{}".format(self.solver(body.name))
@@ -310,15 +332,15 @@ class Compiler(object):
         args_type = []
         for arg in body.parameters:
             name, mtype = self.solver(arg)
-            if  mtype in JavaLib.builtinMap:
-                mtype = JavaLib.builtinMap[mtype]
             args.append(name)
             args_type.append(mtype)
 
-        self.p("def {}{}{}({}):\n".format(functionName,
-            "__" if appendName else "",
-            "__".join([arg.split(".")[-1] for arg in args_type] if appendName else ""),
-            ", ".join(args)), offset = -1)
+        if  appendName: # function overriding
+            self.p("def Oed_{}__{}({}):\n".format(functionName,
+                "__".join([arg.split(".")[-1] for arg in args_type]),
+                ", ".join(args)), offset = -1)
+        else:
+            self.p("def {}({}):\n".format(functionName, ", ".join(args)), offset = -1)
 
         if  not body.body or len(body.body) == 0:
             self.p("pass\n")
@@ -551,6 +573,8 @@ class Compiler(object):
         enclosed_in=None)
         """
         mtype = self.solver(body.type)
+        if  hasattr(self, "includer"):
+            self.includer.addType(mtype)
         args = []
         for arg in body.arguments:
             args.append(self.solver(arg))
@@ -757,6 +781,8 @@ class Compiler(object):
         if  thing == None:
             return thing
         if  type(thing) == str:
+            if  thing in JavaLib.builtinMap:
+                thing = JavaLib.builtinMap[thing]
             if  thing.find("$") > 0:
                 thing = thing.replace("$", "_D")
             return self._kreplace(thing)
@@ -784,7 +810,7 @@ class Compiler(object):
         for method in overloading:
             self.p("\n")
             self.p("def {}(self, *args):\n".format(method))
-            self.p("    fname = \"{}__\" + \"_\".join(i.__class__.__name__ for i in args)\n".format(method))
+            self.p("    fname = \"Oed_{}__\" + \"_\".join(i.__class__.__name__ for i in args)\n".format(method))
             self.p("    func = getattr(self, fname)\n")
             self.p("    return func(*args)\n")
          
@@ -812,20 +838,13 @@ def dumper(body, stop = False):
         exit()
 
 if __name__ == '__main__':
-    logging.basicConfig(level = logging.DEBUG)
-    for handler in logging.root.handlers:
-        handler.addFilter(logging.Filter('Includer'))
+    logging.basicConfig(level = logging.INFO)
     
-    #inputPath = "/Users/lucas/Downloads/PackageInfo.java"
     root = "/Volumes/android/sdk-source-5.1.1_r1/frameworks/base/core/java"
-    #inputPath = "/Users/lucas/Downloads/Enum0.java"
-    inputPath = "/Volumes/android/sdk-source-5.1.1_r1/frameworks/base/core/java/android/animation/AnimatorSet.java"
+    inputPath = "/Volumes/android/sdk-source-5.1.1_r1/frameworks/base/core/java/android/text/style/MetricAffectingSpan.java"
+
     with open(inputPath, "r") as inputFd:
-        #compiler = Compiler(sys.stdout)
-        """
         compiler = Compiler()
-        compiler.compilePackage(root, inputPath)
-        """
-        compiler = Compiler(sys.stdout)
-        #compiler = Compiler()
-        compiler.compile(plyj.Parser().parse_file(inputPath))
+        result = compiler.compilePackage(root, inputPath)
+        print result
+        imports = compiler.imports

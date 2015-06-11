@@ -25,10 +25,15 @@ class Path(Config):
 
 
 class System(Config):
-    WORKINGDIR  = path.abspath(os.getenv("ANDROID_SDK_SRC"))
-    FRAMEWORK   = path.abspath(path.join(WORKINGDIR, "frameworks"))
-    JAVA_POOL   = path.abspath(path.join(WORKINGDIR, "frameworks/base/core/java/"))
-    AIDL_CACHE   = path.abspath(path.join(WORKINGDIR, "out/target/common/obj/JAVA_LIBRARIES/framework_intermediates/"))
+    WORKINGDIR     = path.abspath(os.getenv("ANDROID_SDK_SRC"))
+    FRAMEWORK      = path.abspath(path.join(WORKINGDIR, "frameworks"))
+    JAVA_POOL      = path.abspath(path.join(WORKINGDIR, "frameworks/base/core/java/"))
+    JAVA_GRAPHIC   = path.abspath(path.join(WORKINGDIR, "frameworks/base/graphics/java/"))
+    JAVA_TELECOMM  = path.abspath(path.join(WORKINGDIR, "frameworks/base/telecomm/java/"))
+    JAVA_TELEPHONY = path.abspath(path.join(WORKINGDIR, "frameworks/base/telephony/java/"))
+    JAVA_MEDIA     = path.abspath(path.join(WORKINGDIR, "frameworks/base/media/java/"))
+    JAVA_LOCATION  = path.abspath(path.join(WORKINGDIR, "frameworks/base/location/java/"))
+    AIDL_CACHE     = path.abspath(path.join(WORKINGDIR, "out/target/common/obj/JAVA_LIBRARIES/framework_intermediates/"))
 
     manifest_root = ElementTree.parse(path.join(WORKINGDIR, '.repo/manifest.xml')).getroot()
     VERSION = manifest_root.find('default').attrib["revision"].split("/")[-1]

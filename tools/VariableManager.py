@@ -37,8 +37,6 @@ class VariableManager(object):
 
     def newVariable(self, name, mtype):
         logger.debug(" {}: \033[1;31m{} \033[0m{}".format(" > ".join(str(i) for i in self.path), mtype, name))
-        if  hasattr(self, "includer") and mtype not in JavaLib.builtinMap:
-            self.includer.addType(mtype)
         self.pointer.newVariable(name, mtype)
 
     def setIncluder(self, includer):

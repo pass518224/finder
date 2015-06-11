@@ -28,8 +28,8 @@ class Solver(object):
             exit()
         except Parcel.NoneImplementFunction as e:
             logger.warn(e)
-        except Stub.CallCreator:
-            print " #!! Call creator (Cant resolved) !!#"
+        except Stub.CallCreator as e:
+            logger.warn(e)
 
 class NoDescriptorModule(Exception):
     pass
