@@ -13,7 +13,8 @@ import keyword
 
 from VariableManager import VariableManager
 import JavaLib
-from Includer import Includer
+import IAdaptor
+import Includer
 
 import Config
 
@@ -21,16 +22,14 @@ logger = logging.getLogger(__name__)
 
 class Compiler(object):
     """Java to Python compiler"""
-    def __init__(self, fd=None, indent="    ", dependencyPaths=None, vManager=None):
-        logger.debug("Create compiler with args: fd:{}, indent:<{}>, dependencyPaths: {}>, vManager:{}".format(
-            "Yes" if fd else "No", indent, dependencyPaths, "Yes" if vManager else " No"
+    def __init__(self, fd=None, indent="    ", vManager=None):
+        logger.debug("Create compiler with args: fd:{}, indent:<{}>, vManager:{}".format(
+            "Yes" if fd else "No", indent, "Yes" if vManager else " No"
             ))
         self.fd = fd
         self.outputBuffer = ""
         self.indentPattern = indent
         self.level = 0
-        self.dependencyPaths = dependencyPaths
-        self.interfaceCache = {}
 
         if  vManager:
             self.vManager = vManager # function symbol manager
@@ -43,6 +42,7 @@ class Compiler(object):
         self.loopStack = []
         self.deferExpression = []
         self.inCondition = False
+        self.iAdaptor = IAdaptor.IncludeAdaptor()
 
     """ decorators """
     def itemFilter(func):
@@ -140,10 +140,11 @@ class Compiler(object):
     def compilePackage(self, root, filePath):
         parser = plyj.Parser().parse_file(filePath)
 
-        self.includer = Includer(root, filePath)
-        self.vManager.setIncluder(self.includer)
+        includer = Includer.Includer(root, filePath)
+        self.iAdaptor.setIncluder(includer)
+        self.vManager.setIncluder(includer)
         result = self.compile(parser)
-        self.imports = self.includer.summary()
+        self.imports = includer.summary()
             
         return "".join(["from {} import *\n".format(pkg) for pkg in self.imports]) + result
     
@@ -159,24 +160,22 @@ class Compiler(object):
 
     def PackageDeclaration(self, body):
         name = self.solver(body.name)
-        if  hasattr(self, "includer"):
-            self.includer.setPackage( name)
+        self.iAdaptor.setPackage( name)
         self.c("package " + name)
 
     def ImportDeclaration(self, body):
         name = self.solver(body.name)
-        if  hasattr(self, "includer"):
-            self.includer.addImport(name)
+        self.iAdaptor.addImport(name)
         self.c("import {}".format(name))
 
     @scoped
     def InterfaceDeclaration(self, body):
-        implements = []
-        for impl in body.extends:
-            implements.append(self.solver(impl))
-        if  hasattr(self, "includer"):
-            for impl in implements:
-                self.includer.addType(impl)
+        implements = self.dependency_helper(interfaces=body.extends)
+        for impl in implements:
+            try:
+                self.iAdaptor.addInherit(impl)
+            except Includer.NonIncludeClass as e:
+                implements.remove(impl)
 
         name = self.solver(body.name)
 
@@ -190,28 +189,21 @@ class Compiler(object):
             self.solver(comp)
 
     @scoped
-    def ClassDeclaration(self, body):
-        """
-        extends=<class 'plyj.model.Type'>
-        implements=<type 'list'>
-        """
-        for b in body.body:
-            print  type(b)
-        exit()
-        implements = []
-        if  body.extends:
-            implements.append(self.solver(body.extends))
-        for impl in body.implements:
-            implements.append(self.solver(impl))
+    def ClassDeclaration(self, body, outerName=None, deferClass=[]):
+        implements = self.dependency_helper(classes=body.extends, interfaces=body.implements)
+        name = self.solver(body.name)
+        if  outerName in implements or name in deferClass:
+            deferClass.append(body)
+            return
 
         # special case: (Cloneable)
         if  "Cloneable" in implements:
             implements.remove("Cloneable")
-        if  hasattr(self, "includer"):
-            for impl in implements:
-                self.includer.addType(impl)
-
-        name = self.solver(body.name)
+        for impl in implements:
+            try:
+                self.iAdaptor.addInherit(impl)
+            except Includer.NonIncludeClass as e:
+                implements.remove(impl)
 
         self.p("class {name}({parent}):\n".format(name = name, parent = ", ".join(implements)), offset=-1)
 
@@ -241,6 +233,15 @@ class Compiler(object):
                     self.solver(comp, appendName=True)
                 else:
                     self.solver(comp)
+            elif type(comp) == plyj.ClassDeclaration:
+                localDeferClass = []
+                self.solver(comp, outerName=name, deferClass=localDeferClass)
+                if  len(localDeferClass) > 0:
+                    dClass = localDeferClass.pop()
+                    self.level -= 1
+                    self.solver(dClass, outerName=outerName, deferClass=deferClass)
+                    self.p("{}.{} = {}\n".format(name, self.solver(dClass.name), self.solver(dClass.name)))
+                    self.level += 1
             else:
                 self.solver(comp)
         if  len(body.body) == 0:
@@ -563,7 +564,7 @@ class Compiler(object):
             mtype = "list"
         return variable, mtype
 
-    def InstanceCreation(self, body):
+    def InstanceCreation(self, body, isAnonymous=False):
         """
         InstanceCreation(
         type=Type(name=Name(value='java.util.ArrayList'), type_arguments=[Type(name=Name(value='android.widget.RemoteViews'), type_arguments=[], enclosed_in=None, dimensions=0)], enclosed_in=None, dimensions=0),
@@ -573,8 +574,13 @@ class Compiler(object):
         enclosed_in=None)
         """
         mtype = self.solver(body.type)
-        if  hasattr(self, "includer"):
-            self.includer.addType(mtype)
+
+        #built-in types
+        if  mtype == "Object":
+            mtype = "object"
+        elif  not isAnonymous:
+            self.iAdaptor.addInstance(mtype)
+
         args = []
         for arg in body.arguments:
             args.append(self.solver(arg))
@@ -798,7 +804,7 @@ class Compiler(object):
             result = getattr(self, thing.__class__.__name__)(thing, **kargs)
         except ClassOverriding as e:
             oClass = self.solver(e.args[0])
-            result = self.solver(e.args[1])
+            result = self.solver(e.args[1], isAnonymous=True)
         self.inCondition = oldCondition
         return result
 
@@ -813,6 +819,15 @@ class Compiler(object):
             self.p("    fname = \"Oed_{}__\" + \"_\".join(i.__class__.__name__ for i in args)\n".format(method))
             self.p("    func = getattr(self, fname)\n")
             self.p("    return func(*args)\n")
+
+    def dependency_helper(self, classes=None, interfaces=None):
+        implements = []
+        if  classes:
+            implements.append(self.solver(classes))
+        if  interfaces:
+            for interface in interfaces:
+                implements.append(self.solver(interface))
+        return implements
          
 class Undefined(Exception):
     pass
@@ -838,10 +853,11 @@ def dumper(body, stop = False):
         exit()
 
 if __name__ == '__main__':
-    logging.basicConfig(level = logging.INFO)
+    logging.basicConfig(level = logging.DEBUG)
     
     root = "/Volumes/android/sdk-source-5.1.1_r1/frameworks/base/core/java"
-    inputPath = "/Volumes/android/sdk-source-5.1.1_r1/frameworks/base/core/java/android/text/style/MetricAffectingSpan.java"
+    #inputPath = "/Volumes/android/sdk-source-5.1.1_r1/frameworks/base/core/java/android/text/style/CharacterStyle.java"
+    inputPath = "/Volumes/android/sdk-source-5.1.1_r1/frameworks/base/core/java/android/os/ParcelUuid.java"
 
     with open(inputPath, "r") as inputFd:
         compiler = Compiler()

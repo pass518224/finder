@@ -39,15 +39,16 @@ class Includer(object):
 
     def addType(self, mtype):
         mtype = mtype.split(".")[0]
-        if  mtype in self.includes and mtype not in self.needSolve:
-            logger.debug("add class: {}".format(mtype))
-            self.needSolve.add(mtype)
+        if  mtype in self.includes:
+            if  mtype not in self.needSolve:
+                self.needSolve.add(mtype)
+                logger.debug("add class: {}".format(mtype))
         elif mtype in self.unknownTypes:
             pass
         else:
             self.unknownTypes.add(mtype)
-            #logger.warn("Not included type: {}".format(mtype))
-            #raise NonIncludeClass("type: {}".format(mtype))
+            logger.warn("Not included type: {}".format(mtype))
+            raise NonIncludeClass("type: {}".format(mtype))
 
     def summary(self):
         result = set()

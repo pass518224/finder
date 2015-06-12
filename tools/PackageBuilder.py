@@ -12,7 +12,7 @@ import Compiler
 logger = logging.getLogger(__name__)
 
 if __name__ == '__main__':
-    logging.basicConfig(level=logging.WARN)
+    logging.basicConfig(level=logging.INFO)
 
     sourcePool = [
             Config.System.JAVA_POOL,
