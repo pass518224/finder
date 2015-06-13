@@ -33,6 +33,7 @@ class System(Config):
     JAVA_TELEPHONY = path.abspath(path.join(WORKINGDIR, "frameworks/base/telephony/java/"))
     JAVA_MEDIA     = path.abspath(path.join(WORKINGDIR, "frameworks/base/media/java/"))
     JAVA_LOCATION  = path.abspath(path.join(WORKINGDIR, "frameworks/base/location/java/"))
+    JAVA_LIBS      = [JAVA_POOL, JAVA_GRAPHIC, JAVA_TELECOMM, JAVA_TELEPHONY, JAVA_MEDIA, JAVA_LOCATION]
     AIDL_CACHE     = path.abspath(path.join(WORKINGDIR, "out/target/common/obj/JAVA_LIBRARIES/framework_intermediates/"))
 
     manifest_root = ElementTree.parse(path.join(WORKINGDIR, '.repo/manifest.xml')).getroot()

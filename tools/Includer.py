@@ -8,6 +8,7 @@ class Includer(object):
     def __init__(self, root, fileName):
         self.root = path.abspath(root)
         self.current = path.dirname(path.abspath(fileName))
+        self.className = fileName.split("/")[-1].split(".")[0]
         self.rPath = path.relpath(self.current, root)
         self.packages = set()
         
@@ -39,6 +40,8 @@ class Includer(object):
 
     def addType(self, mtype):
         mtype = mtype.split(".")[0]
+        if  mtype == self.className:
+            return
         if  mtype in self.includes:
             if  mtype not in self.needSolve:
                 self.needSolve.add(mtype)

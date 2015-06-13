@@ -103,6 +103,9 @@ class Compiler(object):
         self.dependencyPaths = dependencyPaths
         self.hasImplement = False
         self.interfaceCache = {}
+        self.imports = {}
+        self.siblings = set()
+        self.pkgName = ""
 
         self.formater = Formater()
         if  vManager:
@@ -196,9 +199,20 @@ class Compiler(object):
             type_declarations.append(self.solver(typer))
 
     def PackageDeclaration(self, body):
-        return self.solver(body.name)
+        name = self.solver(body.name)
+        self.pkgName = name
+        for sourcePath in Config.System.JAVA_LIBS:
+            pkgPath = path.join(sourcePath, name.replace(".", "/"))
+            if  os.path.exists(pkgPath):
+                for file in os.listdir(pkgPath):
+                    if  file.endswith(".java"):
+                        self.siblings.add(file[:-5])
+        return 
 
     def ImportDeclaration(self, body):
+        name = self.solver(body.name)
+        pkg = name.split(".")[-1]
+        self.imports[pkg] = name
         return
         raise Undefined
 
@@ -458,6 +472,10 @@ class Compiler(object):
                 offset = _result.find(".CREATOR")
                 _result = _result[:offset]
                 args.append("\"{}\"".format(_result))
+                """
+                if  len( _result.split(".") ) <= 1:
+                    raise Exception(_result)
+                """
                 creators.add(_result)
             else:
                 args.append(_result)
@@ -484,7 +502,15 @@ class Compiler(object):
         if  name == "createFromParcel":
             offset = target.find(".CREATOR")
             target = target[:offset]
+            if  target in self.imports:
+                target = self.imports[target]
+            elif target in self.siblings:
+                target = "{}.{}".format(self.pkgName, target)
             args.insert(0, "\"{}\"".format(target))
+            """
+            if  len( target.split(".") ) <= 1:
+                raise Exception(target)
+            """
             creators.add(target)
             return "self.creatorResolver({args})".format(args = ", ".join(i for i in args))
 
@@ -640,8 +666,7 @@ if __name__ == '__main__':
 
     
     """
-    inputPath = "/Users/lucas/finder/_IINTERFACE/ICameraService.java"
-    #inputPath = os.path.join(Config.Path._NATIVE_STUB, Config.System.VERSION, "ServiceManagerNative.java")
+    inputPath = "/Users/lucas/finder/_NativeStub/android-5.1.1_r1/ApplicationThreadNative.java"
     with open(inputPath, "r") as inputFd:
         translator(inputFd, sys.stdout)
     """

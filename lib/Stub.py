@@ -1,3 +1,6 @@
+import logging
+
+logger = logging.getLogger(__name__)
 
 class Stub(object):
     def __init__(self):
@@ -10,14 +13,17 @@ class Stub(object):
         _arg0 = self.creatorResolver("android.media.AudioAttributes", data)
         """
         import sys
-        sys.path.append("/Users/lucas/finder/java")
+        sys.path.append("/Users/lucas/finder/Creators")
 
         className = name.split(".")[-1]
-        creator = __import__(name, globals(), locals(), className)
-        creator.CREATOR.createFromParcel(*args)
+        try:
+            creator = __import__(name, globals(), locals(), className)
+            getattr(creator, className).CREATOR.createFromParcel(*args)
+        except ImportError as e:
+            logger.warn(e)
+            return "Unfound creator"
 
         return "creator of [{}]".format(creator)
-        raise CallCreator(args)
 
     def interfaceResolver(self, name, strongBinder):
         """ function call of 'asInterface', ex:

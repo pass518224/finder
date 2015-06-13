@@ -35,6 +35,9 @@ class VariableManager(object):
             del self.path[-1]
             self.pointer = self.path[-1]
 
+    def addAbstract(self, name):
+        self.pointer.newVariable(name, "VIRTUAL")
+
     def newVariable(self, name, mtype):
         logger.debug(" {}: \033[1;31m{} \033[0m{}".format(" > ".join(str(i) for i in self.path), mtype, name))
         self.pointer.newVariable(name, mtype)

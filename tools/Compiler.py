@@ -55,6 +55,7 @@ class Compiler(object):
                     "null"    : "None",
                     "false"   : "False",
                     "true"    : "True",
+                    "this"    : "self",
                 }
             if  _result in reservedWord:
                 _result = reservedWord[_result]
@@ -199,11 +200,15 @@ class Compiler(object):
         # special case: (Cloneable)
         if  "Cloneable" in implements:
             implements.remove("Cloneable")
+        tmp = set()
         for impl in implements:
             try:
                 self.iAdaptor.addInherit(impl)
             except Includer.NonIncludeClass as e:
-                implements.remove(impl)
+                logger.warn(e[0])
+                tmp.add(impl)
+        for i in tmp:
+            implements.remove(i)
 
         self.p("class {name}({parent}):\n".format(name = name, parent = ", ".join(implements)), offset=-1)
 
@@ -218,6 +223,7 @@ class Compiler(object):
         for comp in body.body:
             if  type(comp) == plyj.MethodDeclaration or type(comp) == plyj.ConstructorDeclaration:
                 functionName = self.solver(comp.name)
+                self.vManager.addAbstract(functionName)
                 overloading.append(functionName) if functionName in function_methods else function_methods.add(functionName)
 
         if  len(overloading) > 0:
@@ -226,6 +232,8 @@ class Compiler(object):
                 temp.remove(name)
                 temp.add("__init__")
             self.overloadEntry(temp)
+
+        localDeferClass = []
         for comp in body.body:
             if  type(comp) == plyj.MethodDeclaration or type(comp) == plyj.ConstructorDeclaration:
                 functionName = self.solver(comp.name)
@@ -234,18 +242,18 @@ class Compiler(object):
                 else:
                     self.solver(comp)
             elif type(comp) == plyj.ClassDeclaration:
-                localDeferClass = []
                 self.solver(comp, outerName=name, deferClass=localDeferClass)
-                if  len(localDeferClass) > 0:
-                    dClass = localDeferClass.pop()
-                    self.level -= 1
-                    self.solver(dClass, outerName=outerName, deferClass=deferClass)
-                    self.p("{}.{} = {}\n".format(name, self.solver(dClass.name), self.solver(dClass.name)))
-                    self.level += 1
             else:
                 self.solver(comp)
         if  len(body.body) == 0:
             self.p("pass\n")
+        if  len(localDeferClass) > 0:
+            dClass = localDeferClass.pop()
+            self.level -= 1
+            self.solver(dClass, outerName=outerName, deferClass=deferClass)
+            self.p("{}.{} = {}\n".format(name, self.solver(dClass.name), self.solver(dClass.name)))
+            self.level += 1
+
 
     def ClassInitializer(self, body):
         return
@@ -268,6 +276,8 @@ class Compiler(object):
             if  initializer is None:
                 self.c(mtype)
                 result = "{} = {}\n".format(variable, JavaLib.builtinTypes(mtype))
+            elif initializer.startswith("ANONY_"):
+                result = "{} = {}\n".format(variable, initializer)
             elif not keyword.iskeyword(mtype):
                 result = "{} = {}\n".format(variable, "None")
             else:
@@ -809,7 +819,7 @@ class Compiler(object):
         return result
 
     def AnonymousName(self, length = 16):
-        return ''.join(random.choice(string.lowercase) for i in range(length))
+        return "ANONY_" + ''.join(random.choice(string.lowercase) for i in range(length))
 
     def overloadEntry(self, overloading):
         self.c("Overloading Entries")
@@ -857,7 +867,7 @@ if __name__ == '__main__':
     
     root = "/Volumes/android/sdk-source-5.1.1_r1/frameworks/base/core/java"
     #inputPath = "/Volumes/android/sdk-source-5.1.1_r1/frameworks/base/core/java/android/text/style/CharacterStyle.java"
-    inputPath = "/Volumes/android/sdk-source-5.1.1_r1/frameworks/base/core/java/android/os/ParcelUuid.java"
+    inputPath = "/Volumes/android/sdk-source-5.1.1_r1/frameworks/base/core/java/android/os/BatteryProperties.java"
 
     with open(inputPath, "r") as inputFd:
         compiler = Compiler()

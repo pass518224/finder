@@ -33,10 +33,12 @@ class IncludeAdaptor(object):
 
     @includerCheck
     def addInherit(self, className):
+        logger.debug(" INHERIT>>> {}".format(className))
         self.includer.addType(className)
 
     @includerCheck
     def addInstance(self, className):
+        return
         try:
             self.includer.addType(className)
         except Includer.NonIncludeClass as e:
