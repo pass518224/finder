@@ -72,7 +72,7 @@ In c/c++ coding. But python dont have these features.
 Python doesn't support `i++` or `++i` type unary operator.
 Instead of this `i += 1`.
 
-#### assignment in condition
+#### Assignment in condition
 
 The main problem is java style conditions
 
@@ -85,7 +85,7 @@ The main problem is java style conditions
 This case have an assignment then comparison. 
 
 
-#### multi-times assignment 
+#### Multi-times assignment 
 It is also not supported by Python.
 
     int a = b = 100
@@ -95,6 +95,10 @@ Instead of previous case, we translate the above code into the follows:
     b = 100
     int a = b
 
+
+#### Self-instantiation
+
+>This is to-do
 
 #### Extend outer class
 
