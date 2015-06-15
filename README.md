@@ -1,20 +1,28 @@
 Finder
 ====
 
-A parser for recovering the information dumped while running Android binder driver.
+A parser generator for recovering the ICC (inter-component communication) data. 
+The ICC data are gathered through hooking Android binder driver .
 
-This project contains many tools for collecting defined interface source code in Android framework, extract semantic of variable name, translate `onTransact` function behavior into useful format.
+This project contains the tools for interface source code collection, 
+ variable name semantics extraction, and function behavior translation.
+The interface source code is from Android Framework so far. Our work shall 
+include most of the interfaces of system components so that we can deal with
+basic ICC data. The function behaviors we should considered are in every 
+`onTransact` function, locating in every ICC component.
 
-The main purporse is to translate the raw-byte format itnto human-readable data structure.
+Without directly running these Java code of ICC components, Finder generates 
+python parsers corresponding to ICC components. The main purporse of parsers is 
+to translate the ICC data, raw-byte, into data structures, human-readable. 
+These data structures are also useful for forensic and static analysis.
+
 
 
 Tools
 ----
 
-###Usage
-
-Edit `tools/Config.py` for setup the correct path of project and Android framework.
-Then tools can excute at right path.
+#### `tools/Config.py`
+Config the path of this project and Android framework for interfaces collection.
 
     class Path(Config):
         TOOLS       = path.dirname(path.abspath(__file__))
@@ -28,47 +36,43 @@ Then tools can excute at right path.
         AIDL_CACHE   = path.abspath(path.join(WORKINGDIR, "out/target/common/obj/JAVA_LIBRARIES/framework-base_intermediates/"))
         
 
-### Tools explaination
+#### `tools/CollectIInterface.py`
+Collect interface-define files into path `_IINTERFACE` of `tools/Config.py`
 
-+ `tools/CollectIInterface.py`: Collect interface-define files into path `_IINTERFACE` of `tools/Config.py`
-+ `dumpTransactionCodeFromInterface.py`: Parse files in `_IINTERFACE` and extract the name of transaction code
+#### `tools/dumpTransactionCodeFromInterface.py`
+Parse files in `_IINTERFACE` and extract the name of transaction code
 
 Transaction features
 ----
 
-### Needed Packages to be included
+#### Import Packages
 
-Python need to include/import files only when it want to create **instance** or **extends (implements)**.
+Python parsers include/import other parsers when a **instance** or **extends 
+(implements)** is created. A instance is a Java Class. The source code of the 
+class will be translated into a Python module. The class extent by other classes
+will also has a Python module. The Python module contains the translated Python 
+code for control-flow dependent functions.
 
-Not like java. Java need the exactly size of each class, so if we use a class, even declare a type pointer,
-we have to import the source. This feature make including been very difficult. While translating into Python
-code, only we have to consider is insance and extends.
+Whenever a Java class is refered, Finder shall create and include the 
+corresponding parser.
+
 
 Transaction problems
 ----
 
-### Java built-in packages
+#### Java built-in packages
 
 Java have many built-in packages, we need a standard support of these libraries.
 
-### Unary, assignment in condition(while, for, if, elif) or array accessing
+#### Unary operations
+Usually are used in loop.
 
 In c/c++ coding. But python dont have these features.
 `a++`, `if (i++ > 0)` are not supported in python.
-
-multi-times assignment are also not supported
-
-    int a = b = 100
-
-Instead of previous case, we use:
-
-    b = 100
-    int a = b
-
-So we need to decouple the multi-times assignment in python code.
-
-And, Python doesn't support `i++` or `++i` type unary operator.
+Python doesn't support `i++` or `++i` type unary operator.
 Instead of this `i += 1`.
+
+#### Assignment in condition
 
 The main problem is java style conditions
 
@@ -78,10 +82,25 @@ The main problem is java style conditions
         }
     }
 
-This case have an assignment then comparation. 
-Put an assignment in condition is invalid,
+This case have an assignment then comparison. 
 
-### Extend outer class
+
+#### Multi-times assignment 
+It is also not supported by Python.
+
+    int a = b = 100
+
+Instead of previous case, we translate the above code into the follows:
+
+    b = 100
+    int a = b
+
+
+#### Self-instantiation
+
+>This is to-do
+
+#### Extend outer class
 
 java has a feature to extend outer class like:
 
@@ -100,9 +119,9 @@ java has a feature to extend outer class like:
         }
     }
 
-### Anonymous Class
+#### Anonymous Class
 
-java has anonymous class that let you override the sub-part without explicit declaring a new one
+Java has anonymous class that let you override the sub-part without explicit declaring a new one
 like `PackageInfo.java`
 
     public static final Parcelable.Creator<PackageInfo> CREATOR
@@ -118,10 +137,10 @@ like `PackageInfo.java`
         }
     };
 
-### Function overloading
+#### Function overloading
 
-Java have a feature of function overloadin. 
-The caller will call the corresponding function base on passed parameters. 
+Java have a feature of function overloading. 
+The caller will call the corresponding function base on the parameters types. 
 This feature call **function overloading**.
 
     public Intent putExtra(String name, Serializable value) {
