@@ -4,17 +4,20 @@ import os
 
 logger = logging.getLogger(__name__)
 
+SELF_CREATED = "self_created"
+
 class Includer(object):
     def __init__(self, root, fileName):
         self.root = path.abspath(root)
         self.current = path.dirname(path.abspath(fileName))
-        self.className = fileName.split("/")[-1].split(".")[0]
+        self.myName = fileName.split("/")[-1].split(".")[0]
         self.rPath = path.relpath(self.current, root)
         self.packages = set()
         
         self.includes = {}
         self.needSolve = set()
-        self.unknownTypes = set()
+        self.inherits = set()
+        self.instances = set()
 
     def setPackage(self, pkgName):
         logger.debug("set pkgname: [{}]".format(pkgName))
@@ -38,30 +41,51 @@ class Includer(object):
         abspath = absjoin(self.root, pkg.replace(".", "/") + ".java")
         self.include(cls, pkg2path(self.root, pkg))
 
-    def addType(self, mtype):
+    def addInherit(self, mtype):
+        # get last class name
         mtype = mtype.split(".")[0]
-        if  mtype == self.className:
+
+        if  mtype == self.myName:
             return
         if  mtype in self.includes:
-            if  mtype not in self.needSolve:
+            if  self.includes[mtype] == SELF_CREATED:
+                pass
+            elif  mtype not in self.needSolve and self.includes[mtype] != SELF_CREATED:
                 self.needSolve.add(mtype)
+                self.inherits.add(mtype)
                 logger.debug("add class: {}".format(mtype))
-        elif mtype in self.unknownTypes:
-            pass
         else:
-            self.unknownTypes.add(mtype)
-            logger.warn("Not included type: {}".format(mtype))
-            raise NonIncludeClass("type: {}".format(mtype))
+            logger.warn("Class try to extends none included type: {}".format(mtype))
+            logger.debug(self.includes)
+            raise NonIncludeClass(mtype)
+
+    def addInstance(self, mtype):
+        # get last class name
+        mtype = mtype.split(".")[0]
+
+        if  mtype == self.myName:
+            return
+        if  mtype in self.includes:
+            if  mtype not in self.needSolve and self.includes[mtype] != SELF_CREATED:
+                self.needSolve.add(mtype)
+                self.instances.add(mtype)
+                logger.debug("add class: {}".format(mtype))
+
+    def getInherits(self):
+        result = set()
+        for needed in self.inherits:
+            result.add( path2pkg(self.root, self.includes[needed]))
+        return result
+
+    def getInstances(self):
+        result = set()
+        for needed in self.instances:
+            result.add( path2pkg(self.root, self.includes[needed]))
+        return result
 
     def summary(self):
         result = set()
         for needed in self.needSolve:
-            """
-            if  needed in self.packages:
-                result.add(needed)
-            else:
-                result.add( path2pkg(self.root, self.includes[needed]))
-            """
             result.add( path2pkg(self.root, self.includes[needed]))
         return result
 

@@ -10,6 +10,9 @@ class IncludeAdaptor(object):
     def __init__(self, includer=None):
         self.includer = includer
 
+    def setIncluder(self, includer):
+        self.includer = includer
+
     def includerCheck(func):
 
         def checker(*args, **kargs):
@@ -34,14 +37,24 @@ class IncludeAdaptor(object):
     @includerCheck
     def addInherit(self, className):
         logger.debug(" INHERIT>>> {}".format(className))
-        self.includer.addType(className)
+        self.includer.addInherit(className)
+
+    @includerCheck
+    def defineClass(self, cls):
+        self.includer.include(cls, Includer.SELF_CREATED)
+
+    @includerCheck
+    def defineInterface(self, cls):
+        self.includer.include(cls, Includer.SELF_CREATED)
+
+    def getInherits(self):
+        return self.includer.getInherits()
 
     @includerCheck
     def addInstance(self, className):
-        return
-        try:
-            self.includer.addType(className)
-        except Includer.NonIncludeClass as e:
-            pass
+        self.includer.addInstance(className)
         
+    def getInstances(self):
+        return self.includer.getInstances()
+
 

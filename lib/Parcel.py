@@ -5,6 +5,7 @@ import struct
 import inspect
 import base64
 
+from JavaUtils.String import String
 from PersistableBundle import PersistableBundle
 
 logger = logging.getLogger(__name__)
@@ -84,7 +85,7 @@ class Parcel(object):
     def readString(self):
         result = self.readString16()
         if  len(result) == 0:
-            result = ""
+            result = String("")
         return result
 
     def readStringArray(self):
@@ -94,17 +95,34 @@ class Parcel(object):
         else:
             return None
 
+    def readStringList(self, arrayList):
+        M = arrayList.size();
+        N = self.readInt()
+        i = 0
+        while( i < M and i < N):
+            arrayList.set(i, self.readString())
+            i += 1
+
+        while i < N:
+            arrayList.add(self.readString())
+            i += 1
+
+        while i < M:
+            arrayList.remove(N)
+            i += 1
+
+
     def readString16(self):
         length = self.readInt32()
         if  length == 0:
-            return ""
+            return String("")
         length += 1
         offset = self.offset
         self.offset += length*2
         self.offset = (self.offset + 3) &~ 3
         if  self.offset > len(self.data):
             raise IllegalParcel("Offset out of bound.", "from offset: 0x{:x}, get length: {}, become: {}".format(offset, length, self.offset))
-        return self.data[offset: self.offset].decode("utf16").encode("utf8").strip("\x00")
+        return String(self.data[offset: self.offset].decode("utf16").encode("utf8").strip("\x00"))
 
     def getDescriptor(self):
         self.offset = 4

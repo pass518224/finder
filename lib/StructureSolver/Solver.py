@@ -1,6 +1,7 @@
 import logging
 import os
 import sys
+import traceback
 
 from StubLoader import StubLoader
 import lib.Parcel as Parcel
@@ -25,7 +26,7 @@ class Solver(object):
             print descriptor, code
             print data
             logger.warn(e)
-            exit()
+            traceback.print_exc()
         except Parcel.NoneImplementFunction as e:
             logger.warn(e)
         except Stub.CallCreator as e:

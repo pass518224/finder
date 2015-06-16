@@ -5,8 +5,6 @@ import plyj.parser as plyj
 import sys
 import os
 import json
-import random
-import string
 import inspect
 import re
 import keyword
@@ -15,6 +13,7 @@ from VariableManager import VariableManager
 import JavaLib
 import IAdaptor
 import Includer
+from Helper import *
 
 import Config
 
@@ -35,7 +34,6 @@ class Compiler(object):
             self.vManager = vManager # function symbol manager
         else:
             self.vManager = VariableManager() # variable symbol manager
-        self.dManager = VariableManager() # use to manage dependency of extend/implement variables
         self.managers = []
         self.managers.append(self.vManager)
         self.mainFunction = None
@@ -43,6 +41,11 @@ class Compiler(object):
         self.deferExpression = []
         self.inCondition = False
         self.iAdaptor = IAdaptor.IncludeAdaptor()
+        self.vManager.setIAdaptor(self.iAdaptor)
+
+        # self extend graph
+        self.classGraph = {}
+        self.outsideClasses = {}
 
     """ decorators """
     def itemFilter(func):
@@ -59,7 +62,7 @@ class Compiler(object):
                 }
             if  _result in reservedWord:
                 _result = reservedWord[_result]
-            _result = args[0]._kreplace(_result)
+            _result = keywordReplace_helper(_result)
 
             """docstring for replaceReservedWord"""
             return _result
@@ -123,15 +126,29 @@ class Compiler(object):
         for manager in self.managers:
             manager.leaveScope(body, **kargs)
 
-    def _kreplace(self, string):
-        """keyword replacement"""
-        strs = string.split(".")
-        strs = map(lambda i: "_" + i if keyword.iskeyword(i) else i, strs)
-        return ".".join(strs)
+    def preprocess(self, body):
+        for comp in body.type_declarations:
+            if  type(comp) == plyj.ClassDeclaration:
+                self.buildScope(comp)
 
+    @scoped
+    def buildScope(self, body):
+        if  len(body.body) == 0 or body.body == None:
+            return
+
+        for comp in body.body:
+            if  type(comp) == plyj.ClassDeclaration:
+                self.buildScope(comp)
+        
     def compile(self, body):
         """ entry function """
+        self.preprocess(body)
         self.solver(body)
+        #
+        for clsName in reversed(topological(self.classGraph)):
+            if  clsName in self.outsideClasses:
+                self.solver(self.outsideClasses[clsName], absExtends=True)
+                self.p("{} = {}\n".format(self.vManager.findClass(clsName), clsName))
         if  self.mainFunction:
             self.p("if __name__ == '__main__':\n")
             self.p("    import sys\n")
@@ -147,7 +164,9 @@ class Compiler(object):
         result = self.compile(parser)
         self.imports = includer.summary()
             
-        return "".join(["from {} import *\n".format(pkg) for pkg in self.imports]) + result
+        result = "".join(["from {} import *\n".format(pkg) for pkg in self.iAdaptor.getInherits()]) + result
+        result = result + "".join(["from {} import *\n".format(pkg) for pkg in self.iAdaptor.getInstances()])
+        return result
     
     def CompilationUnit(self, body):
         package_declaration = self.solver(body.package_declaration)
@@ -171,7 +190,7 @@ class Compiler(object):
 
     @scoped
     def InterfaceDeclaration(self, body):
-        implements = self.dependency_helper(interfaces=body.extends)
+        implements = dependency_helper(self.solver, interfaces=body.extends)
         for impl in implements:
             try:
                 self.iAdaptor.addInherit(impl)
@@ -190,50 +209,62 @@ class Compiler(object):
             self.solver(comp)
 
     @scoped
-    def ClassDeclaration(self, body, outerName=None, deferClass=[]):
-        implements = self.dependency_helper(classes=body.extends, interfaces=body.implements)
-        name = self.solver(body.name)
-        if  outerName in implements or name in deferClass:
-            deferClass.append(body)
-            return
+    def ClassDeclaration(self, body, absExtends=False):
+        name, implements, decorators = getClassScheme_helper(body, self.solver)
 
-        # special case: (Cloneable)
-        if  "Cloneable" in implements:
-            implements.remove("Cloneable")
-        tmp = set()
-        for impl in implements:
+        for i in range(len(implements)):
             try:
-                self.iAdaptor.addInherit(impl)
+                self.iAdaptor.addInherit(implements[i])
             except Includer.NonIncludeClass as e:
-                logger.warn(e[0])
-                tmp.add(impl)
-        for i in tmp:
-            implements.remove(i)
+                logger.warn(e)
+            if  absExtends:
+                implements[i] = self.vManager.reversedTable[implements[i]]
 
         self.p("class {name}({parent}):\n".format(name = name, parent = ", ".join(implements)), offset=-1)
 
-        #field process
-        for comp in body.body:
-            if  type(comp) == plyj.FieldDeclaration:
-                self.solver(comp)
-                body.body.remove(comp)
+        if  len(body.body) == 0:
+            self.p("pass\n")
+            return
+
+        # Field => Functions => Classes
+        # -----------------------------
+        # field process
+        tmp = set()
         #body preprocess
         function_methods = set()
         overloading = []
-        for comp in body.body:
-            if  type(comp) == plyj.MethodDeclaration or type(comp) == plyj.ConstructorDeclaration:
-                functionName = self.solver(comp.name)
-                self.vManager.addAbstract(functionName)
-                overloading.append(functionName) if functionName in function_methods else function_methods.add(functionName)
 
+        outsideClasses = {}
+        # first step scanning
+        for comp in body.body:
+            if  type(comp) == plyj.FieldDeclaration:
+                self.solver(comp)
+            elif  type(comp) == plyj.MethodDeclaration or type(comp) == plyj.ConstructorDeclaration:
+                functionName = self.solver(comp.name)
+                overloading.append(functionName) if functionName in function_methods else function_methods.add(functionName)
+            elif type(comp) == plyj.ClassDeclaration:
+                subName, subImplements, subDecorators = getClassScheme_helper(comp, self.solver)
+                depends = deferImplement_helper(self.vManager, subImplements)
+                if  len(depends) > 0:
+                    self.classGraph[subName] = depends
+                    self.outsideClasses[subName] = comp
+                else:
+                    self.solver(comp)
+            elif type(comp) == plyj.InterfaceDeclaration:
+                self.solver(comp)
+            else:
+                self.solver(comp)
+
+        # TODO: remove outsided classes
+
+        # append function overload entry
         if  len(overloading) > 0:
             temp = set(overloading)
             if  name in temp:
-                temp.remove(name)
-                temp.add("__init__")
+                    temp.remove(name)
+                    temp.add("__init__")
             self.overloadEntry(temp)
 
-        localDeferClass = []
         for comp in body.body:
             if  type(comp) == plyj.MethodDeclaration or type(comp) == plyj.ConstructorDeclaration:
                 functionName = self.solver(comp.name)
@@ -241,19 +272,6 @@ class Compiler(object):
                     self.solver(comp, appendName=True)
                 else:
                     self.solver(comp)
-            elif type(comp) == plyj.ClassDeclaration:
-                self.solver(comp, outerName=name, deferClass=localDeferClass)
-            else:
-                self.solver(comp)
-        if  len(body.body) == 0:
-            self.p("pass\n")
-        if  len(localDeferClass) > 0:
-            dClass = localDeferClass.pop()
-            self.level -= 1
-            self.solver(dClass, outerName=outerName, deferClass=deferClass)
-            self.p("{}.{} = {}\n".format(name, self.solver(dClass.name), self.solver(dClass.name)))
-            self.level += 1
-
 
     def ClassInitializer(self, body):
         return
@@ -276,9 +294,10 @@ class Compiler(object):
             if  initializer is None:
                 self.c(mtype)
                 result = "{} = {}\n".format(variable, JavaLib.builtinTypes(mtype))
-            elif initializer.startswith("ANONY_"):
+            elif initializer.startswith(ANONYMOUS_PREFIX):
                 result = "{} = {}\n".format(variable, initializer)
             elif not keyword.iskeyword(mtype):
+            #elif mtype in JavaLib.builtinMap:
                 result = "{} = {}\n".format(variable, "None")
             else:
                 result = "{} = {}\n".format(variable, initializer)
@@ -595,7 +614,7 @@ class Compiler(object):
         for arg in body.arguments:
             args.append(self.solver(arg))
         if  len(body.body) > 0: # anonymous function
-            anonymous = self.AnonymousName()
+            anonymous = AnonymousName_helper()
             oClass = plyj.ClassDeclaration(anonymous, body.body, extends=body.type)
             initializer = plyj.InstanceCreation( anonymous, type_arguments=body.type_arguments, arguments=body.arguments, enclosed_in=body.enclosed_in)
             raise ClassOverriding(oClass, initializer)
@@ -659,11 +678,16 @@ class Compiler(object):
             return "{name}({args})".format(name = name, args = ", ".join(args))
         
         targets = self.solver(body.target).split(".")
+        if  "CREATOR" in targets:
+            index = targets.index("CREATOR")
+            pkg = targets[index-1]
+            logger.info(pkg)
+            self.iAdaptor.addInstance(pkg)
         if targets[0] == "this":
             targets[0] = "self"
         elif self.vManager.isMember(targets[0]):
             targets.insert(0, "self")
-        return "{}.{}({})".format(".".join(self._kreplace(i) for i in targets), name, ", ".join(args))
+        return "{}.{}({})".format(".".join(keywordReplace_helper(i) for i in targets), name, ", ".join(args))
 
     def Wildcard(self, body):
         return 
@@ -799,9 +823,11 @@ class Compiler(object):
         if  type(thing) == str:
             if  thing in JavaLib.builtinMap:
                 thing = JavaLib.builtinMap[thing]
+            if  thing == "this":
+                thing = "self"
             if  thing.find("$") > 0:
                 thing = thing.replace("$", "_D")
-            return self._kreplace(thing)
+            return keywordReplace_helper(thing)
         if  type(thing) == list:
             return thing
 
@@ -818,9 +844,6 @@ class Compiler(object):
         self.inCondition = oldCondition
         return result
 
-    def AnonymousName(self, length = 16):
-        return "ANONY_" + ''.join(random.choice(string.lowercase) for i in range(length))
-
     def overloadEntry(self, overloading):
         self.c("Overloading Entries")
         for method in overloading:
@@ -830,14 +853,6 @@ class Compiler(object):
             self.p("    func = getattr(self, fname)\n")
             self.p("    return func(*args)\n")
 
-    def dependency_helper(self, classes=None, interfaces=None):
-        implements = []
-        if  classes:
-            implements.append(self.solver(classes))
-        if  interfaces:
-            for interface in interfaces:
-                implements.append(self.solver(interface))
-        return implements
          
 class Undefined(Exception):
     pass
@@ -863,11 +878,11 @@ def dumper(body, stop = False):
         exit()
 
 if __name__ == '__main__':
-    logging.basicConfig(level = logging.DEBUG)
+    logging.basicConfig(level = logging.INFO)
     
     root = "/Volumes/android/sdk-source-5.1.1_r1/frameworks/base/core/java"
     #inputPath = "/Volumes/android/sdk-source-5.1.1_r1/frameworks/base/core/java/android/text/style/CharacterStyle.java"
-    inputPath = "/Volumes/android/sdk-source-5.1.1_r1/frameworks/base/core/java/android/os/BatteryProperties.java"
+    inputPath = "/Volumes/android/sdk-source-5.1.1_r1/frameworks/base/core/java/android/net/Uri.java"
 
     with open(inputPath, "r") as inputFd:
         compiler = Compiler()
