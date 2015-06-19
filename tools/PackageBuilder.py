@@ -4,6 +4,7 @@ import logging
 import os
 from os import path
 import copy
+import sys
 
 import Config
 import Includer
@@ -26,15 +27,19 @@ if __name__ == '__main__':
     if not os.path.exists(out):
         os.mkdir(out)
 
-    files = Includer.absjoin(Config.Path.OUT, Config.System.VERSION, "Parcel_list")
-
-    # load used creator files
     imports = set()
-    with open(files, "r") as ffd:
-        pkgs = ffd.read().split("\n")
-    for pkg in pkgs:
-        if  pkg.find(".") > 0:
-            imports.add(pkg)
+    if  len(sys.argv) > 1 and os.path.isfile(Includer.absjoin(out, sys.argv[1].replace(".", "/")+".py")):
+        os.remove(Includer.absjoin(out, sys.argv[1].replace(".", "/")+".py"))
+        imports.add(sys.argv[1])
+    else:
+        files = Includer.absjoin(Config.Path.OUT, Config.System.VERSION, "Parcel_list")
+
+        # load used creator files
+        with open(files, "r") as ffd:
+            pkgs = ffd.read().split("\n")
+        for pkg in pkgs:
+            if  pkg.find(".") > 0:
+                imports.add(pkg)
 
     # empty set
     solvedPkgs = set()
@@ -69,7 +74,12 @@ if __name__ == '__main__':
             logger.info("<<<NEW FILE>>> # {}".format(file))
 
             compiler = Compiler.Compiler()
-            result = compiler.compilePackage(source, file)
+            try:
+                result = compiler.compilePackage(source, file)
+            except:
+                logger.info(file)
+                logger.info(sys.exc_info)
+                raise
 
             newDiscover = compiler.imports - solvedPkgs
             if  len(newDiscover) > 0:

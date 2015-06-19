@@ -43,6 +43,9 @@ class Compiler(object):
         self.iAdaptor = IAdaptor.IncludeAdaptor()
         self.vManager.setIAdaptor(self.iAdaptor)
 
+        # used by instance, function ...
+        self.usedName = set()
+
         # self extend graph
         self.classGraph = {}
         self.outsideClasses = {}
@@ -72,7 +75,6 @@ class Compiler(object):
         def enterScope(*args, **kargs):
             self = args[0]
             body = args[1]
-            self.p("\n")
             self.indent(body)
             result = function(*args, **kargs)
             self.unindent(body)
@@ -101,20 +103,19 @@ class Compiler(object):
     # Compiler Utilitie
     def c(self, fmt):
         if  self.fd is not None:
-            self.fd.write("\n{}# {}\n".format(self.indentPattern*(self.level), fmt))
+            self.fd.write("{}# {}".format(self.indentPattern*(self.level), fmt))
 
     def p(self, fmt, offset=0):
         indents =  self.indentPattern * (self.level + offset)
+        result = indents + fmt
+        while( self.deferExpression):
+            indents =  self.indentPattern * (self.level)
+            result += indents + self.deferExpression.pop()
+
         if  self.fd is not None:
-            self.fd.write(indents + fmt)
-            while( self.deferExpression):
-                indents =  self.indentPattern * (self.level)
-                self.fd.write(indents + self.deferExpression.pop())
+            self.fd.write(result)
         else:
-            self.outputBuffer += indents + fmt
-            while( self.deferExpression):
-                indents =  self.indentPattern * (self.level)
-                self.outputBuffer += indents + self.deferExpression.pop()
+            self.outputBuffer += result
 
     def indent(self, body, **kargs):
         self.level += 1
@@ -128,23 +129,25 @@ class Compiler(object):
 
     def preprocess(self, body):
         for comp in body.type_declarations:
-            if  type(comp) == plyj.ClassDeclaration:
+            mtype = type(comp)
+            if  mtype in [plyj.ClassDeclaration, plyj.MethodDeclaration, plyj.ConstructorDeclaration]:
                 self.buildScope(comp)
 
     @scoped
     def buildScope(self, body):
-        if  len(body.body) == 0 or body.body == None:
+        if  not hasattr(body, "body") or body.body == None or len(body.body) == 0:
             return
 
         for comp in body.body:
-            if  type(comp) == plyj.ClassDeclaration:
+            mtype = type(comp)
+            if  mtype in [plyj.ClassDeclaration, plyj.MethodDeclaration, plyj.ConstructorDeclaration]:
                 self.buildScope(comp)
         
     def compile(self, body):
         """ entry function """
         self.preprocess(body)
         self.solver(body)
-        #
+       
         for clsName in reversed(topological(self.classGraph)):
             if  clsName in self.outsideClasses:
                 self.solver(self.outsideClasses[clsName], absExtends=True)
@@ -160,40 +163,37 @@ class Compiler(object):
 
         includer = Includer.Includer(root, filePath)
         self.iAdaptor.setIncluder(includer)
-        self.vManager.setIncluder(includer)
         result = self.compile(parser)
-        self.imports = includer.summary()
+        self.imports = includer.summary(self.usedName)
             
-        result = "".join(["from {} import *\n".format(pkg) for pkg in self.iAdaptor.getInherits()]) + result
-        result = result + "".join(["from {} import *\n".format(pkg) for pkg in self.iAdaptor.getInstances()])
-        return result
+        prefix = "".join(["from {} import *\n".format(pkg) for pkg in self.iAdaptor.getInherits()])
+        appendix = "".join(["from {} import *\n".format(pkg) for pkg in self.imports])
+        return prefix + result + appendix
     
     def CompilationUnit(self, body):
         package_declaration = self.solver(body.package_declaration)
-        import_declarations = []
         for importer in body.import_declarations:
-            import_declarations.append(self.solver(importer))
+            self.solver(importer)
 
-        type_declarations   = []
         for typer in body.type_declarations:
-            type_declarations.append(self.solver(typer))
+            self.solver(typer)
 
     def PackageDeclaration(self, body):
         name = self.solver(body.name)
         self.iAdaptor.setPackage( name)
-        self.c("package " + name)
+        self.c("package {}\n".format(name))
 
     def ImportDeclaration(self, body):
         name = self.solver(body.name)
         self.iAdaptor.addImport(name)
-        self.c("import {}".format(name))
+        self.c("import {}\n".format(name))
 
     @scoped
     def InterfaceDeclaration(self, body):
         implements = dependency_helper(self.solver, interfaces=body.extends)
         for impl in implements:
             try:
-                self.iAdaptor.addInherit(impl)
+                self.vManager.addInherit(impl)
             except Includer.NonIncludeClass as e:
                 implements.remove(impl)
 
@@ -214,11 +214,11 @@ class Compiler(object):
 
         for i in range(len(implements)):
             try:
-                self.iAdaptor.addInherit(implements[i])
+                self.vManager.addInherit(implements[i])
             except Includer.NonIncludeClass as e:
                 logger.warn(e)
-            if  absExtends:
-                implements[i] = self.vManager.reversedTable[implements[i]]
+            if  absExtends and self.vManager.findClass(implements[i]):
+                implements[i] = self.vManager.getFullPathByName(implements[i])
 
         self.p("class {name}({parent}):\n".format(name = name, parent = ", ".join(implements)), offset=-1)
 
@@ -355,7 +355,6 @@ class Compiler(object):
             functionName = self.solver(body.name)
             if  functionName == "main":
                 self.mainFunction = self.vManager.getPath()
-                self.p("@classmethod\n", offset=-1)
             elif functionName == "toString":
                 functionName = "__str__"
         args = ["self"]
@@ -365,6 +364,7 @@ class Compiler(object):
             args.append(name)
             args_type.append(mtype)
 
+        self.p("@classmethod\n", offset=-1)
         if  appendName: # function overriding
             self.p("def Oed_{}__{}({}):\n".format(functionName,
                 "__".join([arg.split(".")[-1] for arg in args_type]),
@@ -540,12 +540,15 @@ class Compiler(object):
         for arg in body.type_arguments:
             tArgs.append(self.solver(arg))
         type_arguments = ""
-        enclosed_in=body.enclosed_in
+        if  body.enclosed_in:
+            enclosed = self.solver(body.enclosed_in) + "."
+        else:
+            enclosed = ""
         dimensions=body.dimensions
         name = self.solver(body.name)
         if  name in JavaLib.builtinMap:
             name = JavaLib.builtinMap[name]
-        return "{name}{targs}".format(name = name, targs = type_arguments )
+        return "{}{}{}".format(enclosed, name, type_arguments )
 
     def Conditional(self, body):
         predicate = self.solver(body.predicate, inCondition=True)
@@ -562,6 +565,9 @@ class Compiler(object):
         calframe = inspect.getouterframes(curframe, 2)
         caller = calframe[3][3]
         value = body.value
+        if  caller not in ["ImportDeclaration", "PackageDeclaration", "Type"]:
+            for component in value.split("."):
+                self.usedName.add(component)
         if  caller == "Type" :
             return value
         if  self.vManager.isMember(value):
@@ -607,8 +613,6 @@ class Compiler(object):
         #built-in types
         if  mtype == "Object":
             mtype = "object"
-        elif  not isAnonymous:
-            self.iAdaptor.addInstance(mtype)
 
         args = []
         for arg in body.arguments:
@@ -678,11 +682,11 @@ class Compiler(object):
             return "{name}({args})".format(name = name, args = ", ".join(args))
         
         targets = self.solver(body.target).split(".")
-        if  "CREATOR" in targets:
-            index = targets.index("CREATOR")
-            pkg = targets[index-1]
-            logger.info(pkg)
-            self.iAdaptor.addInstance(pkg)
+        # IIntentReceiver.Stub.asInterface
+        if  name == "asInterface" and targets[0][0] == "I" and targets[1] == "Stub": 
+            #return strongBinder
+            return "{}.asInterface(\"{}\")".format(args[0], ".".join(targets[:2]))
+
         if targets[0] == "this":
             targets[0] = "self"
         elif self.vManager.isMember(targets[0]):
@@ -793,7 +797,7 @@ class Compiler(object):
         return "({} {} {})".format(lhs, operator, rhs)
 
     def Cast(self, body):
-        return "{}({})".format(self.solver(body.target), self.solver(body.expression))
+        return "{}".format(self.solver(body.expression))
 
     def Empty(self, body):
         return "pass"
@@ -848,6 +852,7 @@ class Compiler(object):
         self.c("Overloading Entries")
         for method in overloading:
             self.p("\n")
+            self.p("@classmethod\n")
             self.p("def {}(self, *args):\n".format(method))
             self.p("    fname = \"Oed_{}__\" + \"_\".join(i.__class__.__name__ for i in args)\n".format(method))
             self.p("    func = getattr(self, fname)\n")
@@ -882,10 +887,9 @@ if __name__ == '__main__':
     
     root = "/Volumes/android/sdk-source-5.1.1_r1/frameworks/base/core/java"
     #inputPath = "/Volumes/android/sdk-source-5.1.1_r1/frameworks/base/core/java/android/text/style/CharacterStyle.java"
-    inputPath = "/Volumes/android/sdk-source-5.1.1_r1/frameworks/base/core/java/android/net/Uri.java"
+    inputPath = "/Volumes/android/sdk-source-5.1.1_r1/frameworks/base/core/java/com/android/internal/statusbar/StatusBarIcon.java"
 
     with open(inputPath, "r") as inputFd:
-        compiler = Compiler()
-        result = compiler.compilePackage(root, inputPath)
-        print result
+        compiler = Compiler(sys.stdout)
+        print compiler.compilePackage(root, inputPath)
         imports = compiler.imports

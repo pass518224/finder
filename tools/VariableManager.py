@@ -17,7 +17,7 @@ class VariableManager(object):
         self.vTable = globalScope
         self.path = [globalScope]
         self.current = globalScope
-        self.reversedTable = {}
+        self.classPaths = {}
 
     def setIAdaptor(self, iAdaptor):
         self.iAdaptor = iAdaptor
@@ -39,9 +39,8 @@ class VariableManager(object):
             self.path.append(localScope)
 
             if  type(body) == plyj.ClassDeclaration or type(body) == plyj.InterfaceDeclaration:
-                if  name not in self.reversedTable:
-                    self.reversedTable[name] = ".".join(i.name for i in self.path[1:])
-                self.iAdaptor.defineClass(name)
+                if  name not in self.classPaths:
+                    self.classPaths[name] = ".".join(i.name for i in self.path[1:])
 
     def leaveScope(self, body):
         unit = body.__class__.__name__
@@ -54,26 +53,16 @@ class VariableManager(object):
             del self.path[-1]
             self.current = self.path[-1]
 
-    def addAbstract(self, name):
-        self.current.newVariable(name, "VIRTUAL")
+    def addInherit(self, cls):
+        if  cls not in self.classPaths:
+            self.iAdaptor.addInherit(cls)
+        else:
+            pass
+            #put to defer table
 
     def newVariable(self, name, mtype):
         logger.debug(" {}: \033[1;31m{} \033[0m{}".format(" > ".join(str(i) for i in self.path), mtype, name))
         self.current.newVariable(name, mtype)
-        #self.includer.addInstance(mtype)
-
-    def setIncluder(self, includer):
-        self.iAdaptor.setIncluder = includer
-
-    def isExist(self, name):
-        pointer = self.vTable
-        if  name in pointer:
-            return True
-        for index in self.path:
-            pointer = pointer[index]
-            if  name in pointer:
-                return True
-        return False
 
     def isMember(self, name):
         preClass = None
@@ -90,9 +79,14 @@ class VariableManager(object):
         return False
 
     def findClass(self, clsName):
-        if  clsName in self.reversedTable:
-            return self.reversedTable[clsName]
+        if  clsName in self.classPaths:
+            return self.classPaths[clsName]
         return None
+
+    def getFullPathByName(self, cls):
+        if  cls not in self.classPaths:
+            raise Exception("Try to access a none self class: {}".format(cls))
+        return self.classPaths[cls]
 
     def getPath(self):
         return ".".join(str(i) for i in self.path[1:])

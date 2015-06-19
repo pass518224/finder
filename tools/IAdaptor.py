@@ -40,21 +40,10 @@ class IncludeAdaptor(object):
         self.includer.addInherit(className)
 
     @includerCheck
-    def defineClass(self, cls):
-        self.includer.include(cls, Includer.SELF_CREATED)
-
-    @includerCheck
-    def defineInterface(self, cls):
-        self.includer.include(cls, Includer.SELF_CREATED)
-
     def getInherits(self):
         return self.includer.getInherits()
 
     @includerCheck
-    def addInstance(self, className):
-        self.includer.addInstance(className)
-        
-    def getInstances(self):
-        return self.includer.getInstances()
-
+    def summary(self):
+        return self.includer.summary()
 

@@ -12,27 +12,20 @@ class Includer(object):
         self.current = path.dirname(path.abspath(fileName))
         self.myName = fileName.split("/")[-1].split(".")[0]
         self.rPath = path.relpath(self.current, root)
-        self.packages = set()
+        self.packages = ""
         
         self.includes = {}
         self.needSolve = set()
         self.inherits = set()
-        self.instances = set()
 
     def setPackage(self, pkgName):
         logger.debug("set pkgname: [{}]".format(pkgName))
         self.pkgName = pkgName
-        """
-        if self.current != absjoin(self.root, pkgName.replace(".", "/")):
-            logger.warn("dirpath: [{}]".format(self.current))
-            logger.warn("pkgpath: [{}]".format(absjoin(self.root, pkgName.replace(".", "/"))))
-            raise WrongPackageName
-        """
         for file in os.listdir(self.current):
             if  file.endswith(".java"):
                 cls = file[:-5]
                 abspath = absjoin(self.current, file)
-                self.packages.add(cls)
+                self.packages = cls
                 self.include(cls, abspath)
         
     def addImport(self, pkg):
@@ -48,47 +41,27 @@ class Includer(object):
         if  mtype == self.myName:
             return
         if  mtype in self.includes:
-            if  self.includes[mtype] == SELF_CREATED:
-                pass
-            elif  mtype not in self.needSolve and self.includes[mtype] != SELF_CREATED:
-                self.needSolve.add(mtype)
-                self.inherits.add(mtype)
-                logger.debug("add class: {}".format(mtype))
+            self.inherits.add(mtype)
+            logger.debug("add class: {}".format(mtype))
         else:
             logger.warn("Class try to extends none included type: {}".format(mtype))
-            logger.debug(self.includes)
             raise NonIncludeClass(mtype)
-
-    def addInstance(self, mtype):
-        # get last class name
-        mtype = mtype.split(".")[0]
-
-        if  mtype == self.myName:
-            return
-        if  mtype in self.includes:
-            if  mtype not in self.needSolve and self.includes[mtype] != SELF_CREATED:
-                self.needSolve.add(mtype)
-                self.instances.add(mtype)
-                logger.debug("add class: {}".format(mtype))
 
     def getInherits(self):
         result = set()
-        for needed in self.inherits:
-            result.add( path2pkg(self.root, self.includes[needed]))
+        for needle in self.inherits:
+            result.add(path2pkg(self.root, self.includes[needle]))
         return result
 
-    def getInstances(self):
+    def summary(self, usedName):
+        total = set(self.includes)
+        instances = (total - self.inherits) & usedName
+        if self.myName in instances:
+            instances.remove(self.myName)
         result = set()
-        for needed in self.instances:
-            result.add( path2pkg(self.root, self.includes[needed]))
+        for needle in instances:
+            result.add(path2pkg(self.root, self.includes[needle]))
         return result
-
-    def summary(self):
-        result = set()
-        for needed in self.needSolve:
-            result.add( path2pkg(self.root, self.includes[needed]))
-        return result
-
     """
     Utilities
     """
@@ -99,7 +72,7 @@ class Includer(object):
 def path2pkg(root, file):
     rel = path.relpath(file, root)
     if  not rel.endswith(".java"):
-        raise Exception("not a valid file path")
+        raise Exception("not a valid file path:\n\t{}/{}".format(root, file))
     return rel[:-5].replace("/", ".")
 
 def pkg2path(root, pkg):

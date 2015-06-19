@@ -18,10 +18,10 @@ class Stub(object):
         className = name.split(".")[-1]
         try:
             creator = __import__(name, globals(), locals(), className)
-            getattr(creator, className).CREATOR.createFromParcel(*args)
         except ImportError as e:
             logger.warn(e)
-            return "Unfound creator"
+            return "Unfound creator: {}".format(name)
+        getattr(creator, className).CREATOR.createFromParcel(*args)
 
         return "creator of [{}]".format(creator)
 

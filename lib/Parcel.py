@@ -6,6 +6,7 @@ import inspect
 import base64
 
 from JavaUtils.String import String
+from JavaUtils.IBinder import IBinder
 from PersistableBundle import PersistableBundle
 
 logger = logging.getLogger(__name__)
@@ -23,12 +24,12 @@ class Parcel(object):
         return self.readString()
 
     def readStrongBinder(self):
-        return self.readObject(False)
+        return IBinder(self.readObject(False))
 
     def readObject(self, nullMetaData):
         self.offset += BYTE *4
         """ TODO """
-        return None
+        return "<<Strong binder>>"
 
     def readPersistableBundle(self, loader=None):
         length = self.readInt()
@@ -123,6 +124,18 @@ class Parcel(object):
         if  self.offset > len(self.data):
             raise IllegalParcel("Offset out of bound.", "from offset: 0x{:x}, get length: {}, become: {}".format(offset, length, self.offset))
         return String(self.data[offset: self.offset].decode("utf16").encode("utf8").strip("\x00"))
+
+    def readParcelable(self, loader):
+        raise NoneImplementFunction("readParcelable")
+        creator = self.readParcelableCreator(loader)
+        if  creator == None:
+            return None
+
+    def readParcelableCreator(self, loader):
+        name = self.readString()
+        if  name == None:
+            return None
+
 
     def getDescriptor(self):
         self.offset = 4
