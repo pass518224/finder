@@ -57,4 +57,6 @@ builtinClass = set([
     "Streamable",
     "Transferable",
     "TypeVariable",
+    # dynamic catched builting java libraries
+    "ThreadLocal",
 ])

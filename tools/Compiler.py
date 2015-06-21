@@ -10,6 +10,7 @@ import re
 import keyword
 
 from VariableManager import VariableManager
+import SchemeBuilder
 import JavaLib
 import IAdaptor
 import Includer
@@ -21,12 +22,13 @@ logger = logging.getLogger(__name__)
 
 class Compiler(object):
     """Java to Python compiler"""
-    def __init__(self, fd=None, indent="    ", vManager=None):
+    def __init__(self, fd=None, sBuilder=None, indent="    ", vManager=None):
         logger.debug("Create compiler with args: fd:{}, indent:<{}>, vManager:{}".format(
             "Yes" if fd else "No", indent, "Yes" if vManager else " No"
             ))
         self.fd = fd
         self.outputBuffer = ""
+        self.sBuilder = sBuilder
         self.indentPattern = indent
         self.level = 0
 
@@ -128,21 +130,8 @@ class Compiler(object):
             manager.leaveScope(body, **kargs)
 
     def preprocess(self, body):
-        for comp in body.type_declarations:
-            mtype = type(comp)
-            if  mtype in [plyj.ClassDeclaration, plyj.MethodDeclaration, plyj.ConstructorDeclaration]:
-                self.buildScope(comp)
+        SchemeBuilder.buildHelper(body, self.vManager)
 
-    @scoped
-    def buildScope(self, body):
-        if  not hasattr(body, "body") or body.body == None or len(body.body) == 0:
-            return
-
-        for comp in body.body:
-            mtype = type(comp)
-            if  mtype in [plyj.ClassDeclaration, plyj.MethodDeclaration, plyj.ConstructorDeclaration]:
-                self.buildScope(comp)
-        
     def compile(self, body):
         """ entry function """
         self.preprocess(body)
@@ -164,10 +153,12 @@ class Compiler(object):
         includer = Includer.Includer(root, filePath)
         self.iAdaptor.setIncluder(includer)
         result = self.compile(parser)
-        self.imports = includer.summary(self.usedName)
+        dependsPkgs = self.iAdaptor.getInherits()
+        usedPkgs = includer.getUsedPkgs(self.usedName)
             
-        prefix = "".join(["from {} import *\n".format(pkg) for pkg in self.iAdaptor.getInherits()])
-        appendix = "".join(["from {} import *\n".format(pkg) for pkg in self.imports])
+        prefix = "".join(["from {} import *\n".format(pkg) for pkg in dependsPkgs])
+        appendix = "".join(["from {} import *\n".format(pkg) for pkg in usedPkgs])
+        self.imports = usedPkgs.union(dependsPkgs)
         return prefix + result + appendix
     
     def CompilationUnit(self, body):
@@ -797,7 +788,7 @@ class Compiler(object):
         return "({} {} {})".format(lhs, operator, rhs)
 
     def Cast(self, body):
-        return "{}".format(self.solver(body.expression))
+        return self.solver(body.expression)
 
     def Empty(self, body):
         return "pass"
@@ -887,7 +878,7 @@ if __name__ == '__main__':
     
     root = "/Volumes/android/sdk-source-5.1.1_r1/frameworks/base/core/java"
     #inputPath = "/Volumes/android/sdk-source-5.1.1_r1/frameworks/base/core/java/android/text/style/CharacterStyle.java"
-    inputPath = "/Volumes/android/sdk-source-5.1.1_r1/frameworks/base/core/java/com/android/internal/statusbar/StatusBarIcon.java"
+    inputPath = "/Volumes/android/sdk-source-5.1.1_r1/frameworks/base/core/java/android/os/RemoteCallback.java"
 
     with open(inputPath, "r") as inputFd:
         compiler = Compiler(sys.stdout)

@@ -40,6 +40,10 @@ class Includer(object):
 
         if  mtype == self.myName:
             return
+        if  mtype == "Exception":
+            return
+        elif mtype == "Exception":
+            logger.warn("Exception not in builtins")
         if  mtype in self.includes:
             self.inherits.add(mtype)
             logger.debug("add class: {}".format(mtype))
@@ -53,7 +57,7 @@ class Includer(object):
             result.add(path2pkg(self.root, self.includes[needle]))
         return result
 
-    def summary(self, usedName):
+    def getUsedPkgs(self, usedName):
         total = set(self.includes)
         instances = (total - self.inherits) & usedName
         if self.myName in instances:
@@ -62,6 +66,9 @@ class Includer(object):
         for needle in instances:
             result.add(path2pkg(self.root, self.includes[needle]))
         return result
+
+    def summary(self, usedName):
+        pass
     """
     Utilities
     """

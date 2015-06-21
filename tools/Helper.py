@@ -13,10 +13,20 @@ logger = logging.getLogger(__name__)
 def dependency_helper(solver, classes=None, interfaces=None):
     implements = set()
     if  classes:
-        implements.add(solver(classes))
+        extName = solver(classes)
+        if  extName.endswith("Exception"):
+            extName = "Exception"
+        if  extName == "Creator":
+            extName = "Parcelable.Creator"
+        implements.add(extName)
     if  interfaces:
         for interface in interfaces:
-            implements.add(solver(interface))
+            extName = solver(interface)
+            if  extName.endswith("Exception"):
+                extName = "Exception"
+            if  extName == "Creator":
+                extName = "Parcelable.Creator"
+            implements.add(extName)
 
     return list(implements - JavaLib.builtinClass)
 

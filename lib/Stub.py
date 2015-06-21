@@ -16,11 +16,14 @@ class Stub(object):
         sys.path.append("/Users/lucas/finder/Creators")
 
         className = name.split(".")[-1]
+        creator = __import__(name, globals(), locals(), className)
+        """
         try:
             creator = __import__(name, globals(), locals(), className)
         except ImportError as e:
             logger.warn(e)
             return "Unfound creator: {}".format(name)
+        """
         getattr(creator, className).CREATOR.createFromParcel(*args)
 
         return "creator of [{}]".format(creator)
