@@ -31,6 +31,8 @@ class Solver(object):
             logger.warn(e)
         except Stub.CallCreator as e:
             logger.warn(e)
+        except:
+            print traceback.format_exc()
 
 class NoDescriptorModule(Exception):
     pass

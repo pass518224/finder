@@ -20,6 +20,59 @@ import Config
 
 logger = logging.getLogger(__name__)
 
+INITIAL_CLASS = "object"
+SELF_INSTANCE = "_SELF"
+
+""" decorators """
+def itemFilter(func):
+    """ hook on some function that will generate 'single' name,
+    such as : variable name, parameter, hard-code string
+    """
+    def replaceReservedWord(*args, **kargs):
+        _result = func(*args, **kargs)
+        reservedWord = {
+                "null"    : "None",
+                "false"   : "False",
+                "true"    : "True",
+                "this"    : SELF_INSTANCE,
+            }
+        if  _result in reservedWord:
+            _result = reservedWord[_result]
+        _result = keywordReplace_helper(_result)
+
+        """docstring for replaceReservedWord"""
+        return _result
+    return replaceReservedWord
+
+def scoped(function):
+    def enterScope(*args, **kargs):
+        self = args[0]
+        body = args[1]
+        self.indent(body)
+        result = function(*args, **kargs)
+        self.unindent(body)
+        return result
+    return enterScope
+
+def loop(fun):
+    """Enter a loop"""
+    def enterLoop(*args, **kargs):
+        self = args[0]
+        body = args[1]
+        if  hasattr(self, "loopUpdate"):
+            self.loopStack.append(self.loopUpdate)
+
+        if  hasattr(body, "update") and body.update:
+            self.loopUpdate = body.update
+        else:
+            self.loopUpdate = None
+        result = fun(*args, **kargs)
+        del self.loopUpdate
+        if  len(self.loopStack) > 0:
+            self.loopUpdate = self.loopStack.pop()
+        return result
+    return enterLoop
+
 class Compiler(object):
     """Java to Python compiler"""
     def __init__(self, fd=None, sBuilder=None, indent="    ", vManager=None):
@@ -47,60 +100,13 @@ class Compiler(object):
 
         # used by instance, function ...
         self.usedName = set()
+        self.fieldUsedName = set()
 
         # self extend graph
         self.classGraph = {}
         self.outsideClasses = {}
+        self.anonyClasses = {}
 
-    """ decorators """
-    def itemFilter(func):
-        """ hook on some function that will generate 'single' name,
-        such as : variable name, parameter, hard-code string
-        """
-        def replaceReservedWord(*args, **kargs):
-            _result = func(*args, **kargs)
-            reservedWord = {
-                    "null"    : "None",
-                    "false"   : "False",
-                    "true"    : "True",
-                    "this"    : "self",
-                }
-            if  _result in reservedWord:
-                _result = reservedWord[_result]
-            _result = keywordReplace_helper(_result)
-
-            """docstring for replaceReservedWord"""
-            return _result
-        return replaceReservedWord
-
-    def scoped(function):
-        def enterScope(*args, **kargs):
-            self = args[0]
-            body = args[1]
-            self.indent(body)
-            result = function(*args, **kargs)
-            self.unindent(body)
-            return result
-        return enterScope
-
-    def loop(fun):
-        """Enter a loop"""
-        def enterLoop(*args, **kargs):
-            self = args[0]
-            body = args[1]
-            if  hasattr(self, "loopUpdate"):
-                self.loopStack.append(self.loopUpdate)
-
-            if  hasattr(body, "update") and body.update:
-                self.loopUpdate = body.update
-            else:
-                self.loopUpdate = None
-            result = fun(*args, **kargs)
-            del self.loopUpdate
-            if  len(self.loopStack) > 0:
-                self.loopUpdate = self.loopStack.pop()
-            return result
-        return enterLoop
 
     # Compiler Utilitie
     def c(self, fmt):
@@ -141,6 +147,10 @@ class Compiler(object):
             if  clsName in self.outsideClasses:
                 self.solver(self.outsideClasses[clsName], absExtends=True)
                 self.p("{} = {}\n".format(self.vManager.findClass(clsName), clsName))
+            elif clsName in self.anonyClasses:
+                oClass, variable, initializer = self.anonyClasses[clsName]
+                self.solver(oClass)
+                self.p("{} = {}\n".format(variable, initializer))
         if  self.mainFunction:
             self.p("if __name__ == '__main__':\n")
             self.p("    import sys\n")
@@ -154,9 +164,13 @@ class Compiler(object):
         self.iAdaptor.setIncluder(includer)
         result = self.compile(parser)
         dependsPkgs = self.iAdaptor.getInherits()
-        usedPkgs = includer.getUsedPkgs(self.usedName)
+        dependsPkgs = dependsPkgs.union(self.iAdaptor.getMore(self.fieldUsedName))
+        usedPkgs = includer.getUsedPkgs(self.usedName - self.fieldUsedName)
             
-        prefix = "".join(["from {} import *\n".format(pkg) for pkg in dependsPkgs])
+        builtinImports = [
+            "from lib.Switch import Switch\n",
+        ]
+        prefix = "".join(builtinImports) + "".join(["from {} import *\n".format(pkg) for pkg in dependsPkgs])
         appendix = "".join(["from {} import *\n".format(pkg) for pkg in usedPkgs])
         self.imports = usedPkgs.union(dependsPkgs)
         return prefix + result + appendix
@@ -176,44 +190,32 @@ class Compiler(object):
 
     def ImportDeclaration(self, body):
         name = self.solver(body.name)
-        self.iAdaptor.addImport(name)
+        self.iAdaptor.addImport(name, body.static)
         self.c("import {}\n".format(name))
 
     @scoped
-    def InterfaceDeclaration(self, body):
-        implements = dependency_helper(self.solver, interfaces=body.extends)
+    def InterfaceDeclaration(self, body, absExtends=False):
+        name, implements, decorators = getInterfaceScheme_helper(body, self.solver, self.vManager)
+
+        tmp = set()
         for impl in implements:
             try:
                 self.vManager.addInherit(impl)
             except Includer.NonIncludeClass as e:
-                implements.remove(impl)
+                tmp.add(impl)
+                logger.warn(e)
+        map(implements.remove, tmp)
 
-        name = self.solver(body.name)
+        if  absExtends:
+            for i in range(len(implements)):
+                if  self.vManager.findClass(implements[i]):
+                    implements[i] = self.vManager.getFullPathByName(implements[i])
 
+        if  len(implements) == 0:
+            implements.append(INITIAL_CLASS)
         self.c("# interface")
         self.p("class {name}({parent}):\n".format(name = name, parent = ", ".join(implements)), offset=-1)
         if  not body.body or len(body.body) == 0:
-            self.p("pass\n")
-            return
-
-        for comp in body.body:
-            self.solver(comp)
-
-    @scoped
-    def ClassDeclaration(self, body, absExtends=False):
-        name, implements, decorators = getClassScheme_helper(body, self.solver)
-
-        for i in range(len(implements)):
-            try:
-                self.vManager.addInherit(implements[i])
-            except Includer.NonIncludeClass as e:
-                logger.warn(e)
-            if  absExtends and self.vManager.findClass(implements[i]):
-                implements[i] = self.vManager.getFullPathByName(implements[i])
-
-        self.p("class {name}({parent}):\n".format(name = name, parent = ", ".join(implements)), offset=-1)
-
-        if  len(body.body) == 0:
             self.p("pass\n")
             return
 
@@ -225,8 +227,6 @@ class Compiler(object):
         function_methods = set()
         overloading = []
 
-        outsideClasses = {}
-        # first step scanning
         for comp in body.body:
             if  type(comp) == plyj.FieldDeclaration:
                 self.solver(comp)
@@ -234,7 +234,7 @@ class Compiler(object):
                 functionName = self.solver(comp.name)
                 overloading.append(functionName) if functionName in function_methods else function_methods.add(functionName)
             elif type(comp) == plyj.ClassDeclaration:
-                subName, subImplements, subDecorators = getClassScheme_helper(comp, self.solver)
+                subName, subImplements, subDecorators = getClassScheme_helper(comp, self.solver, self.vManager)
                 depends = deferImplement_helper(self.vManager, subImplements)
                 if  len(depends) > 0:
                     self.classGraph[subName] = depends
@@ -242,7 +242,86 @@ class Compiler(object):
                 else:
                     self.solver(comp)
             elif type(comp) == plyj.InterfaceDeclaration:
+                subName, subImplements, subDecorators = getInterfaceScheme_helper(comp, self.solver, self.vManager)
+                depends = deferImplement_helper(self.vManager, subImplements)
+                if  len(depends) > 0:
+                    self.classGraph[subName] = depends
+                    self.outsideClasses[subName] = comp
+                else:
+                    self.solver(comp)
+            else:
                 self.solver(comp)
+
+        for comp in body.body:
+            if  type(comp) == plyj.MethodDeclaration or type(comp) == plyj.ConstructorDeclaration:
+                functionName = self.solver(comp.name)
+                if  functionName in overloading:
+                    self.solver(comp, appendName=True)
+                else:
+                    self.solver(comp)
+
+    @scoped
+    def ClassDeclaration(self, body, absExtends=False):
+        name, implements, decorators = getClassScheme_helper(body, self.solver, self.vManager)
+
+        tmp = set()
+        for impl in implements:
+            try:
+                self.vManager.addInherit(impl)
+            except Includer.NonIncludeClass as e:
+                tmp.add(impl)
+                logger.warn(e)
+        map(implements.remove, tmp)
+
+        if  absExtends:
+            for i in range(len(implements)):
+                if  self.vManager.findClass(implements[i]):
+                    implements[i] = self.vManager.getFullPathByName(implements[i])
+        if  len(implements) == 0:
+            implements.append(INITIAL_CLASS)
+
+        self.p("class {name}({parent}):\n".format(name = name, parent = ", ".join(implements)), offset=-1)
+
+        if  len(body.body) == 0:
+            self.p("pass\n")
+            return
+        elif type(body.body[0]) == plyj.ClassInitializer:
+            self.p("pass\n")
+            return
+
+        # Field => Functions => Classes
+        # -----------------------------
+        # field process
+        tmp = set()
+        #body preprocess
+        function_methods = set()
+        overloading = []
+
+        # first step scanning
+        for comp in body.body:
+            if  type(comp) == plyj.FieldDeclaration:
+                self.solver(comp)
+            elif  type(comp) == plyj.MethodDeclaration or type(comp) == plyj.ConstructorDeclaration:
+                self.vManager.newScope(comp)
+                self.vManager.leaveScope(comp)
+                functionName = self.solver(comp.name)
+                overloading.append(functionName) if functionName in function_methods else function_methods.add(functionName)
+            elif type(comp) == plyj.ClassDeclaration:
+                subName, subImplements, subDecorators = getClassScheme_helper(comp, self.solver, self.vManager)
+                depends = deferImplement_helper(self.vManager, subImplements)
+                if  len(depends) > 0:
+                    self.classGraph[subName] = depends
+                    self.outsideClasses[subName] = comp
+                else:
+                    self.solver(comp)
+            elif type(comp) == plyj.InterfaceDeclaration:
+                subName, subImplements, subDecorators = getInterfaceScheme_helper(comp, self.solver, self.vManager)
+                depends = deferImplement_helper(self.vManager, subImplements)
+                if  len(depends) > 0:
+                    self.classGraph[subName] = depends
+                    self.outsideClasses[subName] = comp
+                else:
+                    self.solver(comp)
             else:
                 self.solver(comp)
 
@@ -280,22 +359,38 @@ class Compiler(object):
         mtype = self.solver(body.type)
         variable_declarators = []
         for var in body.variable_declarators:
+            if  var.initializer and type(var.initializer) == plyj.InstanceCreation and len(var.initializer.body) > 0:
+                mtype = self.solver(var.initializer.type)
+                variable = self.solver(var.variable)
+                anonymous = AnonymousName_helper()
+                oClass = plyj.ClassDeclaration(anonymous, var.initializer.body, extends=mtype)
+                initializer = plyj.InstanceCreation(
+                        anonymous,
+                        type_arguments=var.initializer.type_arguments,
+                        arguments=var.initializer.arguments,
+                        enclosed_in=var.initializer.enclosed_in)
+                self.classGraph[anonymous] = mtype
+                self.anonyClasses[anonymous] = (oClass, self.vManager.getPath() + "." + variable, self.solver(initializer))
+                return
+
             variable, initializer = self.solver(var)
-            self.vManager.newVariable(variable, mtype)
+            self.vManager.newVariable(variable, mtype, isMember=True)
             if  initializer is None:
                 self.c(mtype)
                 result = "{} = {}\n".format(variable, JavaLib.builtinTypes(mtype))
-            elif initializer.startswith(ANONYMOUS_PREFIX):
+            elif initializer.startswith(ANONYMOUS_PREFIX) or type(var.initializer) in [plyj.Literal, plyj.Unary]:
+                if  type(var.initializer) == plyj.Name:
+                    for part in initializer.split("."):
+                        self.fieldUsedName.add(part)
+                    if  initializer in self.vManager.members:
+                        initializer = self.vManager.members[initializer]
                 result = "{} = {}\n".format(variable, initializer)
-            elif not keyword.iskeyword(mtype):
-            #elif mtype in JavaLib.builtinMap:
-                result = "{} = {}\n".format(variable, "None")
             else:
-                result = "{} = {}\n".format(variable, initializer)
+                result = "{} = None\n".format(variable)
             self.p(result)
 
     def FieldAccess(self, body):
-        return "self.{}".format(self.solver(body.name))
+        return "{}.{}".format(SELF_INSTANCE, self.solver(body.name))
 
     def ConstructorDeclaration(self, body, appendName = False):
         """
@@ -313,7 +408,7 @@ class Compiler(object):
         for arg in body.arguments:
             sArg = self.solver(arg)
             arguments.append(sArg)
-        self.p("super(self.__class__, self).__init__({})\n".format(", ".join(arguments)))
+        self.p("super({}.__class__, {}).__init__({})\n".format(SELF_INSTANCE, SELF_INSTANCE, ", ".join(arguments)))
 
     def MethodDeclaration(self, body, appendName = False):
         """
@@ -348,7 +443,7 @@ class Compiler(object):
                 self.mainFunction = self.vManager.getPath()
             elif functionName == "toString":
                 functionName = "__str__"
-        args = ["self"]
+        args = [SELF_INSTANCE]
         args_type = []
         for arg in body.parameters:
             name, mtype = self.solver(arg)
@@ -378,7 +473,14 @@ class Compiler(object):
         """
         Throw(exception=InstanceCreation(type=Type(name=Name(value='IllegalArgumentException'), type_arguments=[], enclosed_in=None, dimensions=0), type_arguments=[], arguments=[Additive(operator='+', lhs=Additive(operator='+', lhs=Literal(value='"Invalid character "'), rhs=Name(value='nibble')), rhs=Literal(value='" in hex string"'))], body=[], enclosed_in=None))
         """
-        self.p("raise {}\n".format(self.solver(body.exception)))
+        if  hasattr(body.exception, "arugments"):
+            result = ""
+            for args in body.exception.arguments:
+                result += self.solver(args)
+        else:
+            result = self.solver(body.exception)
+        result = result.replace("\"", "'")
+        self.p("raise Exception(\"{}\")\n".format(result))
 
     #@scoped
     def Synchronized(self, body):
@@ -404,19 +506,27 @@ class Compiler(object):
     def Switch(self, body):
 
         value = self.solver(body.expression)
-        cases      = body.switch_cases
+        cases = body.switch_cases
         self.p("for mycase in Switch({}):\n".format(value), offset=-1)
         for case in cases:
             self.solver(case)
 
     @scoped
     def SwitchCase(self, body):
-        cases = body.cases
+        cases = []
+        for case in body.cases:
+            case = self.solver(case)
+            if  self.vManager.isMember(case):
+                cases.append("{}.{}".format(SELF_INSTANCE, case))
+            elif case in self.vManager.classPaths:
+                cases.append(self.vManager.classPaths[case])
+            else:
+                cases.append(case)
 
         if  cases[0] == "default":
             self.p("if mycase():\n", offset=-1)
         else:
-            self.p("if {case}:\n".format(case=" and ".join("mycase(" + self.solver(i) + ")" for i in cases)), offset=-1)
+            self.p("if {}:\n".format(" and ".join("mycase(" + i + ")" for i in cases)), offset=-1)
 
         if  len(body.body) == 0:
             self.p("pass\n")
@@ -562,13 +672,13 @@ class Compiler(object):
         if  caller == "Type" :
             return value
         if  self.vManager.isMember(value):
-            return "self." + value
+            return "{}.{}".format(SELF_INSTANCE, value)
         return value
         
     @itemFilter
     def Literal(self, body):
         value = body.value
-        if  re.match(r'[\d\.]+f$', value):
+        if  re.match(r'[\d\.]+[fF]$', value):
             value = str(float(value[:-1]))
         return value
 
@@ -600,6 +710,7 @@ class Compiler(object):
         enclosed_in=None)
         """
         mtype = self.solver(body.type)
+        self.usedName.add(mtype)
 
         #built-in types
         if  mtype == "Object":
@@ -614,7 +725,8 @@ class Compiler(object):
             initializer = plyj.InstanceCreation( anonymous, type_arguments=body.type_arguments, arguments=body.arguments, enclosed_in=body.enclosed_in)
             raise ClassOverriding(oClass, initializer)
         else:
-            return "{}{}({})".format("self." if self.vManager.isMember(mtype) else "", mtype, ", ".join(args))
+            return "{}({})".format(mtype, ", ".join(args))
+            #return "{}{}({})".format(SELF_INSTANCE + "." if self.vManager.isMember(mtype) else "", mtype, ", ".join(args))
 
     @scoped
     def OverloadingInstance(self, variableDeclarator):
@@ -669,7 +781,7 @@ class Compiler(object):
 
         if body.target is None:
             if  self.vManager.isMember(name):
-                name = "self." + name
+                name = "{}.{}".format(SELF_INSTANCE, name)
             return "{name}({args})".format(name = name, args = ", ".join(args))
         
         targets = self.solver(body.target).split(".")
@@ -679,9 +791,9 @@ class Compiler(object):
             return "{}.asInterface(\"{}\")".format(args[0], ".".join(targets[:2]))
 
         if targets[0] == "this":
-            targets[0] = "self"
+            targets[0] = SELF_INSTANCE
         elif self.vManager.isMember(targets[0]):
-            targets.insert(0, "self")
+            targets.insert(0, SELF_INSTANCE)
         return "{}.{}({})".format(".".join(keywordReplace_helper(i) for i in targets), name, ", ".join(args))
 
     def Wildcard(self, body):
@@ -819,7 +931,7 @@ class Compiler(object):
             if  thing in JavaLib.builtinMap:
                 thing = JavaLib.builtinMap[thing]
             if  thing == "this":
-                thing = "self"
+                thing = SELF_INSTANCE
             if  thing.find("$") > 0:
                 thing = thing.replace("$", "_D")
             return keywordReplace_helper(thing)
@@ -836,6 +948,7 @@ class Compiler(object):
         except ClassOverriding as e:
             oClass = self.solver(e.args[0])
             result = self.solver(e.args[1], isAnonymous=True)
+
         self.inCondition = oldCondition
         return result
 
@@ -845,7 +958,7 @@ class Compiler(object):
             self.p("\n")
             self.p("@classmethod\n")
             self.p("def {}(self, *args):\n".format(method))
-            self.p("    fname = \"Oed_{}__\" + \"_\".join(i.__class__.__name__ for i in args)\n".format(method))
+            self.p("    fname = \"Oed_{}__\" + \"__\".join(i.__class__.__name__ for i in args)\n".format(method))
             self.p("    func = getattr(self, fname)\n")
             self.p("    return func(*args)\n")
 
@@ -878,8 +991,7 @@ if __name__ == '__main__':
     
     root = "/Volumes/android/sdk-source-5.1.1_r1/frameworks/base/core/java"
     #inputPath = "/Volumes/android/sdk-source-5.1.1_r1/frameworks/base/core/java/android/text/style/CharacterStyle.java"
-    inputPath = "/Volumes/android/sdk-source-5.1.1_r1/frameworks/base/core/java/android/os/RemoteCallback.java"
-
+    inputPath = "/Volumes/android/sdk-source-5.1.1_r1/frameworks/base/core/java/android/view/RenderNodeAnimator.java"
     with open(inputPath, "r") as inputFd:
         compiler = Compiler(sys.stdout)
         print compiler.compilePackage(root, inputPath)

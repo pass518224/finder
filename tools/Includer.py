@@ -2,6 +2,8 @@ import logging
 from os import path
 import os
 
+import Config
+
 logger = logging.getLogger(__name__)
 
 SELF_CREATED = "self_created"
@@ -28,7 +30,13 @@ class Includer(object):
                 self.packages = cls
                 self.include(cls, abspath)
         
-    def addImport(self, pkg):
+    def addImport(self, pkg, isStatic):
+        if  isStatic:
+            pkg = ".".join(pkg.split(".")[:-1])
+
+        if  not (pkg.split(".")[0] == "java" or isExistFile(pkg)):
+            return
+
         logger.debug("import {}".format(pkg))
         cls = pkg.split(".")[-1]
         abspath = absjoin(self.root, pkg.replace(".", "/") + ".java")
@@ -42,18 +50,22 @@ class Includer(object):
             return
         if  mtype == "Exception":
             return
-        elif mtype == "Exception":
-            logger.warn("Exception not in builtins")
         if  mtype in self.includes:
             self.inherits.add(mtype)
             logger.debug("add class: {}".format(mtype))
         else:
-            logger.warn("Class try to extends none included type: {}".format(mtype))
-            raise NonIncludeClass(mtype)
+            raise NonIncludeClass("Class try to extends none included type: {}".format(mtype))
 
     def getInherits(self):
         result = set()
         for needle in self.inherits:
+            result.add(path2pkg(self.root, self.includes[needle]))
+        return result
+
+    def getMore(self, pkgNames):
+        total = set(self.includes)
+        result = set()
+        for needle in (total & pkgNames):
             result.add(path2pkg(self.root, self.includes[needle]))
         return result
 
@@ -69,6 +81,7 @@ class Includer(object):
 
     def summary(self, usedName):
         pass
+
     """
     Utilities
     """
@@ -87,6 +100,15 @@ def pkg2path(root, pkg):
 
 def absjoin(*args):
     return path.abspath(path.join(*args))
+
+def isExistFile(pkg):
+    sourcePool = Config.System.JAVA_LIBS
+    for source in sourcePool:
+        file = pkg2path(source, pkg)
+        if  os.path.isfile(file):
+            return True
+    return False
+
 
 class WrongPackageName(Exception):
     pass

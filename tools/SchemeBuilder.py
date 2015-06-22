@@ -39,7 +39,7 @@ def _buildHelper(body, vManager):
         if  type(comp) in [plyj.MethodDeclaration, plyj.ConstructorDeclaration]:
             vManager.newScope(comp)
             vManager.leaveScope(comp)
-        elif type(comp) == plyj.ClassDeclaration:
+        elif type(comp) == plyj.ClassDeclaration or type(comp) == plyj.InterfaceDeclaration:
             vManager.newScope(comp)
             if  comp.body != None and len(comp.body) > 0:
                 _buildHelper(comp, vManager)
@@ -50,7 +50,7 @@ def buildHelper(plyTree, vManager):
     if  type(plyTree) != CompilationUnit:
         raise Exception("Input is not a CompilationUnit, given {}".format(type(plyTree)))
     for comp in plyTree.type_declarations:
-        if type(comp) in [plyj.MethodDeclaration, plyj.ConstructorDeclaration, plyj.ClassDeclaration]:
+        if type(comp) in [plyj.MethodDeclaration, plyj.ConstructorDeclaration, plyj.ClassDeclaration, plyj.InterfaceDeclaration]:
             vManager.newScope(comp)
             _buildHelper(comp, vManager)
             vManager.leaveScope(comp)

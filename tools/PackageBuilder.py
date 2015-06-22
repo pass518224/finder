@@ -15,20 +15,14 @@ logger = logging.getLogger(__name__)
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO)
 
-    sourcePool = [
-            Config.System.JAVA_POOL,
-            Config.System.JAVA_GRAPHIC,
-            Config.System.JAVA_TELECOMM ,
-            Config.System.JAVA_TELEPHONY,
-            Config.System.JAVA_MEDIA    ,
-            Config.System.JAVA_LOCATION ,
-        ]
+    sourcePool = Config.System.JAVA_LIBS
     out = path.join(Config.Path.OUT, Config.System.VERSION, "java")
     if not os.path.exists(out):
         os.mkdir(out)
 
     imports = set()
     if  len(sys.argv) > 1 and os.path.isfile(Includer.absjoin(out, sys.argv[1].replace(".", "/")+".py")):
+        logger.info("input pkg: {}".format(sys.argv[1]))
         os.remove(Includer.absjoin(out, sys.argv[1].replace(".", "/")+".py"))
         imports.add(sys.argv[1])
     else:

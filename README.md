@@ -169,6 +169,10 @@ Python also have this feature. But it have different properties.
 But the usage of Python is different with java.
 So we have to implement an adaptor to convert the type into corresponding function interface.
 
+#### Casted variable as overloading input
+
+#### Cycle import
+
 Related work
 ----
 

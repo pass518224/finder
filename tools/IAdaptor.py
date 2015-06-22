@@ -31,8 +31,8 @@ class IncludeAdaptor(object):
         self.includer.setPackage(pkg)
 
     @includerCheck
-    def addImport(self, pkg):
-        self.includer.addImport(pkg)
+    def addImport(self, pkg, isStatic):
+        self.includer.addImport(pkg, isStatic)
 
     @includerCheck
     def addInherit(self, className):
@@ -42,6 +42,10 @@ class IncludeAdaptor(object):
     @includerCheck
     def getInherits(self):
         return self.includer.getInherits()
+
+    def getMore(self, pkgNames):
+        return self.includer.getMore(pkgNames)
+
 
     @includerCheck
     def summary(self):

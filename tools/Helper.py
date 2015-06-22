@@ -10,12 +10,14 @@ logger = logging.getLogger(__name__)
 
 
 # solver needed
-def dependency_helper(solver, classes=None, interfaces=None):
+def dependency_helper(solver, vManager, classes=None, interfaces=None):
     implements = set()
     if  classes:
         extName = solver(classes)
         if  extName.endswith("Exception"):
             extName = "Exception"
+        if  extName in vManager.reversedClassPaths:
+            extName = vManager.reversedClassPaths[extName]
         if  extName == "Creator":
             extName = "Parcelable.Creator"
         implements.add(extName)
@@ -24,17 +26,23 @@ def dependency_helper(solver, classes=None, interfaces=None):
             extName = solver(interface)
             if  extName.endswith("Exception"):
                 extName = "Exception"
+            if  extName in vManager.reversedClassPaths:
+                extName = vManager.reversedClassPaths[extName]
             if  extName == "Creator":
                 extName = "Parcelable.Creator"
             implements.add(extName)
 
     return list(implements - JavaLib.builtinClass)
 
-def getClassScheme_helper(cls, solver):
-    implements = dependency_helper(solver, classes=cls.extends, interfaces=cls.implements)
+def getClassScheme_helper(cls, solver, vManager):
     name = solver(cls.name)
+    implements = dependency_helper(solver, vManager, classes=cls.extends)
     return name, implements, {}
 
+def getInterfaceScheme_helper(cls, solver, vManager):
+    name = solver(cls.name)
+    implements = dependency_helper(solver, vManager)
+    return name, implements, {}
 
 # solver needless
 def keywordReplace_helper(string):
@@ -49,12 +57,11 @@ def AnonymousName_helper(length = 16):
 
 def deferImplement_helper(vManager, implements):
     depends = []
-    for clsName in implements:
-        if  vManager.findClass(clsName):
-            depends.append(clsName)
+    for i in range(len(implements)):
+        if  vManager.findClass(implements[i]):
+            depends.append(implements[i])
     return depends
 
-GRAY, BLACK = 0, 1
 """
 # Simple:
 # a --> b
@@ -67,6 +74,7 @@ graph1 = {
     "d": []
 }
 """
+GRAY, BLACK = 0, 1
 def topological(graph):
     order, enter, state = deque(), set(graph), {}
  

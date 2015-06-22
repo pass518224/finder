@@ -25,6 +25,7 @@ builtinMap ={
         "str": "str",
         "double": "float",
         "float": "float",
+        "Float": "float",
         "boolean": "bool",
 }
 
@@ -35,6 +36,7 @@ builtinClass = set([
     "Cloneable",
     "Closeable",
     "Comparable",
+    "Comparator",
     "Compilable",
     "Destroyable",
     "Externalizable",

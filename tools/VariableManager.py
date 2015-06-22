@@ -4,6 +4,7 @@ import JavaLib
 import json
 
 import IAdaptor
+import Helper
 
 logger = logging.getLogger(__name__)
 
@@ -18,6 +19,12 @@ class VariableManager(object):
         self.path = [globalScope]
         self.current = globalScope
         self.classPaths = {}
+        self.reversedClassPaths = {}
+
+        #member tabel
+        self.members = {}
+        self.reversedMember = {}
+
 
     def setIAdaptor(self, iAdaptor):
         self.iAdaptor = iAdaptor
@@ -29,7 +36,7 @@ class VariableManager(object):
         type(body) == plyj.InterfaceDeclaration or
         type(body) == plyj.MethodDeclaration or
         type(body) == plyj.ConstructorDeclaration):
-            name = body.name
+            name = Helper.keywordReplace_helper(body.name)
             logger.debug(">>>>>> {}::{}".format(unit, name))
             localScope = self.current.getCallableVariable(name)
             if  not localScope:
@@ -40,7 +47,11 @@ class VariableManager(object):
 
             if  type(body) == plyj.ClassDeclaration or type(body) == plyj.InterfaceDeclaration:
                 if  name not in self.classPaths:
-                    self.classPaths[name] = ".".join(i.name for i in self.path[1:])
+                    self.classPaths[name] = self.getPath()
+                    self.reversedClassPaths[self.getPath()] = name
+
+    def getPath(self):
+        return ".".join(i.name for i in self.path[1:])
 
     def leaveScope(self, body):
         unit = body.__class__.__name__
@@ -54,15 +65,14 @@ class VariableManager(object):
             self.current = self.path[-1]
 
     def addInherit(self, cls):
-        if  cls not in self.classPaths:
-            self.iAdaptor.addInherit(cls)
-        else:
-            pass
-            #put to defer table
+        self.iAdaptor.addInherit(cls)
 
-    def newVariable(self, name, mtype):
+    def newVariable(self, name, mtype, isMember=False):
         logger.debug(" {}: \033[1;31m{} \033[0m{}".format(" > ".join(str(i) for i in self.path), mtype, name))
         self.current.newVariable(name, mtype)
+        if  isMember and name not in self.members:
+            self.members[name] = self.getPath() + "." + name
+            self.reversedMember[self.getPath() + "." + name] = name
 
     def isMember(self, name):
         preClass = None
@@ -144,3 +154,7 @@ class VariableManager(object):
 
         def __repr__(self):
             return str(self.variables)
+
+class NeedFixName(Exception):
+    pass
+
