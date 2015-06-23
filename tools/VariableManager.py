@@ -25,6 +25,16 @@ class VariableManager(object):
         self.members = {}
         self.reversedMember = {}
 
+    def snapshot(self):
+        path = list(self.path)
+        current = self.current
+        return (path, current)
+
+    def setSnapshot(self, snapshot):
+        path, current = snapshot
+        self.path = path
+        self.current = current
+
 
     def setIAdaptor(self, iAdaptor):
         self.iAdaptor = iAdaptor
@@ -32,15 +42,13 @@ class VariableManager(object):
 
     def newScope(self, body):
         unit = body.__class__.__name__
-        if  (type(body) == plyj.ClassDeclaration or
-        type(body) == plyj.InterfaceDeclaration or
-        type(body) == plyj.MethodDeclaration or
-        type(body) == plyj.ConstructorDeclaration):
+        if  type(body) in [plyj.ClassDeclaration, plyj.InterfaceDeclaration, plyj.MethodDeclaration, plyj.ConstructorDeclaration]:
             name = Helper.keywordReplace_helper(body.name)
             logger.debug(">>>>>> {}::{}".format(unit, name))
             localScope = self.current.getCallableVariable(name)
             if  not localScope:
                 localScope = self.Scope(name, unit)
+                localScope.update(self.current)
             self.current.newCallable(name, localScope)
             self.current = localScope
             self.path.append(localScope)
@@ -64,8 +72,13 @@ class VariableManager(object):
             del self.path[-1]
             self.current = self.path[-1]
 
+    def addMacro(self, name):
+        globalPath = self.getPath() + "." + name
+        self.current.addMacro(name, globalPath)
+
     def addInherit(self, cls):
-        self.iAdaptor.addInherit(cls)
+        if not self.findClass(cls):
+            self.iAdaptor.addInherit(cls)
 
     def newVariable(self, name, mtype, isMember=False):
         logger.debug(" {}: \033[1;31m{} \033[0m{}".format(" > ".join(str(i) for i in self.path), mtype, name))
@@ -125,6 +138,7 @@ class VariableManager(object):
         def __init__(self, name, vtype):
             self.name = name
             self.vtype = vtype
+            self.globalAddress = {}
             self.variables = {}
             self.callables = {}
 
@@ -142,6 +156,12 @@ class VariableManager(object):
 
         def newVariable(self, name, type):
             self.variables[name] = type
+
+        def addMacro(self, name, address):
+            self.globalAddress[name] = address
+
+        def update(self, scope):
+            self.globalAddress = dict(scope.globalAddress)
 
         def getCallableVariable(self, name):
             if  name in self.callables:

@@ -14,6 +14,7 @@ import SchemeBuilder
 import JavaLib
 import IAdaptor
 import Includer
+import DeferClassManager
 from Helper import *
 
 import Config
@@ -104,10 +105,7 @@ class Compiler(object):
         self.fieldUsedName = set()
 
         # self extend graph
-        self.classGraph = {}
-        self.outsideClasses = {}
-        self.anonyClasses = {}
-
+        self.deferManager = DeferClassManager.DeferClassManager(self.vManager)
 
     # Compiler Utilitie
     def c(self, fmt):
@@ -154,19 +152,13 @@ class Compiler(object):
         self.preprocess(body)
         self.solver(body)
        
-        while(len(self.classGraph) > 0):
-            classGraph = self.classGraph
-            outsideClasses = self.outsideClasses
-            self.outsideClasses = {}
-            self.classGraph = {}
-            anonyClasses = self.anonyClasses
-            self.anonyClasses = {}
-            for clsName in reversed(topological(classGraph)):
-                if  clsName in outsideClasses:
-                    self.solver(outsideClasses[clsName], absExtends=True)
-                    self.p("{} = {}\n".format(self.vManager.findClass(clsName), clsName))
-                elif clsName in anonyClasses:
-                    oClass, variable, initializer = anonyClasses[clsName]
+        while(not self.deferManager.isEmpty()):
+            for cls in self.deferManager.sort():
+                if  cls.mtype == DeferClassManager.CLASS:
+                    self.solver(cls.obj, absExtends=True)
+                    self.p("{} = {}\n".format(self.vManager.findClass(cls.name), cls.name))
+                elif cls.mtype == DeferClassManager.ANONYMOUS:
+                    oClass, variable, initializer = cls.obj
                     self.solver(oClass)
                     self.p("{} = {}\n".format(variable, initializer))
         if  self.mainFunction:
@@ -252,8 +244,7 @@ class Compiler(object):
             elif type(comp) == plyj.ClassDeclaration:
                 subName, subImplements, subDecorators = getClassScheme_helper(comp, self.solver, self.vManager)
                 depends = deferImplement_helper(self.vManager, subImplements)
-                self.classGraph[subName] = depends
-                self.outsideClasses[subName] = comp
+                self.deferManager.addClass(subName, depends, comp)
             elif type(comp) == plyj.InterfaceDeclaration:
                 subName, subImplements, subDecorators = getInterfaceScheme_helper(comp, self.solver, self.vManager)
                 depends = deferImplement_helper(self.vManager, subImplements)
@@ -322,13 +313,15 @@ class Compiler(object):
             elif type(comp) == plyj.ClassDeclaration:
                 subName, subImplements, subDecorators = getClassScheme_helper(comp, self.solver, self.vManager)
                 depends = deferImplement_helper(self.vManager, subImplements)
-                self.classGraph[subName] = depends
-                self.outsideClasses[subName] = comp
+                self.deferManager.addClass(subName, depends, comp)
             elif type(comp) == plyj.InterfaceDeclaration:
                 subName, subImplements, subDecorators = getInterfaceScheme_helper(comp, self.solver, self.vManager)
                 depends = deferImplement_helper(self.vManager, subImplements)
-                self.classGraph[subName] = depends
-                self.outsideClasses[subName] = comp
+                if  len(depends) > 0:
+                    self.classGraph[subName] = depends
+                    self.outsideClasses[subName] = comp
+                else:
+                    self.solver(comp)
             else:
                 self.solver(comp)
 
@@ -376,8 +369,7 @@ class Compiler(object):
                         type_arguments=var.initializer.type_arguments,
                         arguments=var.initializer.arguments,
                         enclosed_in=var.initializer.enclosed_in)
-                self.classGraph[anonymous] = mtype
-                self.anonyClasses[anonymous] = (oClass, self.vManager.getPath() + "." + variable, self.solver(initializer))
+                self.deferManager.addAnonyClass(anonymous, [mtype], (oClass, self.vManager.getPath() + "." + variable, self.solver(initializer)))
                 return
 
             variable, initializer = self.solver(var)

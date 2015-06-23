@@ -1,4 +1,5 @@
 import logging
+import re
 import plyj.parser as plyj
 from plyj.model import  CompilationUnit
 
@@ -35,6 +36,8 @@ class SchemeBuilder(object):
         pass
 
 def _buildHelper(body, vManager):
+    MACRO_PATTERN = r"[A-Z_]+"
+    upperPattern = re.compile(MACRO_PATTERN)
     for comp in body.body:
         if  type(comp) in [plyj.MethodDeclaration, plyj.ConstructorDeclaration]:
             vManager.newScope(comp)
@@ -44,6 +47,12 @@ def _buildHelper(body, vManager):
             if  comp.body != None and len(comp.body) > 0:
                 _buildHelper(comp, vManager)
             vManager.leaveScope(comp)
+        elif type(comp) == plyj.FieldDeclaration:
+            for variable in comp.variable_declarators:
+                name = variable.variable.name
+                if  upperPattern.match(name):
+                    vManager.addMacro(name)
+
 
 def buildHelper(plyTree, vManager):
     """build helper: for builing exist plyj tree with given VariableManager"""
