@@ -15,6 +15,20 @@ def dependency_helper(solver, vManager, classes=None, interfaces=None):
     return set()
 
 class SimpleCompiler(Compiler.Compiler):
+    def p(self, fmt, offset=0):
+        indents =  self.indentPattern * (self.level + offset)
+        result = ""
+
+        result += indents + fmt
+        while( self.deferExpression):
+            indents =  self.indentPattern * (self.level)
+            result += indents + self.deferExpression.pop()
+
+        if  self.fd is not None:
+            self.fd.write(result)
+        else:
+            self.outputBuffer += result
+
     @Compiler.scoped
     def InterfaceDeclaration(self, body, absExtends=False):
         name, implements, decorators = getInterfaceScheme_helper(body, self.solver, self.vManager)
@@ -182,8 +196,33 @@ class SimpleCompiler(Compiler.Compiler):
             self.p(result)
 
 if __name__ == '__main__':
-    source = Config.System.LIBCORE
+    source = Config.System.LIBJAVA
     out    = path.abspath(path.join(Config.Path.OUT, Config.System.VERSION, "java/java"))
+
+    for root, dirs, files in os.walk(source):
+        files = [i for i in files if i.endswith(".java")]
+        for file in files:
+            inPath = root 
+            inFile = path.abspath(path.join(inPath, file))
+            outPath = path.abspath(path.join(out, path.relpath(inPath, source)))
+            outFile = path.abspath(path.join(outPath, file.replace(".java", ".py")))
+            compiler = SimpleCompiler()
+            parser = plyj.Parser().parse_file(inFile)
+            result = compiler.compile(parser)
+            
+            if not os.path.exists(outPath):
+                os.makedirs(outPath)
+            outFd = open(outFile, "w")
+            outFd.write(result)
+            outFd.close()
+
+    for root, dirs, files in os.walk(out):
+        init = path.join(root, "__init__.py")
+        with open(init, 'w'):
+            os.utime(init, None)
+
+    source = Config.System.LIBCORE
+    out    = path.abspath(path.join(Config.Path.OUT, Config.System.VERSION, "java/libcore"))
 
     for root, dirs, files in os.walk(source):
         files = [i for i in files if i.endswith(".java")]

@@ -43,9 +43,9 @@ class IncludeAdaptor(object):
     def getInherits(self):
         return self.includer.getInherits()
 
+    @includerCheck
     def getMore(self, pkgNames):
         return self.includer.getMore(pkgNames)
-
 
     @includerCheck
     def summary(self):

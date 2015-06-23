@@ -34,7 +34,7 @@ class Includer(object):
         if  isStatic:
             pkg = ".".join(pkg.split(".")[:-1])
 
-        if  not (pkg.split(".")[0] == "java" or isExistFile(pkg)):
+        if  not (pkg.split(".")[0] == "libcore" or pkg.split(".")[0] == "java" or isExistFile(pkg)):
             return
 
         logger.debug("import {}".format(pkg))

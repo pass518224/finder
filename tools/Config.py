@@ -27,7 +27,8 @@ class Path(Config):
 class System(Config):
     WORKINGDIR     = path.abspath(os.getenv("ANDROID_SDK_SRC"))
     FRAMEWORK      = path.abspath(path.join(WORKINGDIR, "frameworks"))
-    LIBCORE        = path.abspath(path.join(WORKINGDIR, "libcore/luni/src/main/java/java/"))
+    LIBCORE        = path.abspath(path.join(WORKINGDIR, "libcore/luni/src/main/java/libcore/"))
+    LIBJAVA        = path.abspath(path.join(WORKINGDIR, "libcore/luni/src/main/java/java/"))
     JAVA_POOL      = path.abspath(path.join(WORKINGDIR, "frameworks/base/core/java/"))
     JAVA_GRAPHIC   = path.abspath(path.join(WORKINGDIR, "frameworks/base/graphics/java/"))
     JAVA_TELECOMM  = path.abspath(path.join(WORKINGDIR, "frameworks/base/telecomm/java/"))

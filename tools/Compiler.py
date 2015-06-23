@@ -100,6 +100,7 @@ class Compiler(object):
 
         # used by instance, function ...
         self.usedName = set()
+        self.totalUsed = set()
         self.fieldUsedName = set()
 
         # self extend graph
@@ -111,11 +112,19 @@ class Compiler(object):
     # Compiler Utilitie
     def c(self, fmt):
         if  self.fd is not None:
-            self.fd.write("{}# {}".format(self.indentPattern*(self.level), fmt))
+            self.fd.write("{}# {}\n".format(self.indentPattern*(self.level), fmt))
 
     def p(self, fmt, offset=0):
         indents =  self.indentPattern * (self.level + offset)
-        result = indents + fmt
+        result = ""
+
+        if  len(self.usedName) > 0:
+            more = self.iAdaptor.getMore(self.usedName) - self.iAdaptor.getInherits()
+            if  len(more) > 0:
+                for imp in more:
+                    result += "{}from {} import *\n".format(indents, imp)
+
+        result += indents + fmt
         while( self.deferExpression):
             indents =  self.indentPattern * (self.level)
             result += indents + self.deferExpression.pop()
@@ -124,6 +133,8 @@ class Compiler(object):
             self.fd.write(result)
         else:
             self.outputBuffer += result
+        self.totalUsed = self.totalUsed.union(self.usedName)
+        self.usedName = set()
 
     def indent(self, body, **kargs):
         self.level += 1
@@ -143,14 +154,21 @@ class Compiler(object):
         self.preprocess(body)
         self.solver(body)
        
-        for clsName in reversed(topological(self.classGraph)):
-            if  clsName in self.outsideClasses:
-                self.solver(self.outsideClasses[clsName], absExtends=True)
-                self.p("{} = {}\n".format(self.vManager.findClass(clsName), clsName))
-            elif clsName in self.anonyClasses:
-                oClass, variable, initializer = self.anonyClasses[clsName]
-                self.solver(oClass)
-                self.p("{} = {}\n".format(variable, initializer))
+        while(len(self.classGraph) > 0):
+            classGraph = self.classGraph
+            outsideClasses = self.outsideClasses
+            self.outsideClasses = {}
+            self.classGraph = {}
+            anonyClasses = self.anonyClasses
+            self.anonyClasses = {}
+            for clsName in reversed(topological(classGraph)):
+                if  clsName in outsideClasses:
+                    self.solver(outsideClasses[clsName], absExtends=True)
+                    self.p("{} = {}\n".format(self.vManager.findClass(clsName), clsName))
+                elif clsName in anonyClasses:
+                    oClass, variable, initializer = anonyClasses[clsName]
+                    self.solver(oClass)
+                    self.p("{} = {}\n".format(variable, initializer))
         if  self.mainFunction:
             self.p("if __name__ == '__main__':\n")
             self.p("    import sys\n")
@@ -165,15 +183,13 @@ class Compiler(object):
         result = self.compile(parser)
         dependsPkgs = self.iAdaptor.getInherits()
         dependsPkgs = dependsPkgs.union(self.iAdaptor.getMore(self.fieldUsedName))
-        usedPkgs = includer.getUsedPkgs(self.usedName - self.fieldUsedName)
+        self.imports = includer.getMore(self.totalUsed).union(dependsPkgs)
             
         builtinImports = [
             "from lib.Switch import Switch\n",
         ]
         prefix = "".join(builtinImports) + "".join(["from {} import *\n".format(pkg) for pkg in dependsPkgs])
-        appendix = "".join(["from {} import *\n".format(pkg) for pkg in usedPkgs])
-        self.imports = usedPkgs.union(dependsPkgs)
-        return prefix + result + appendix
+        return prefix + result
     
     def CompilationUnit(self, body):
         package_declaration = self.solver(body.package_declaration)
@@ -236,11 +252,8 @@ class Compiler(object):
             elif type(comp) == plyj.ClassDeclaration:
                 subName, subImplements, subDecorators = getClassScheme_helper(comp, self.solver, self.vManager)
                 depends = deferImplement_helper(self.vManager, subImplements)
-                if  len(depends) > 0:
-                    self.classGraph[subName] = depends
-                    self.outsideClasses[subName] = comp
-                else:
-                    self.solver(comp)
+                self.classGraph[subName] = depends
+                self.outsideClasses[subName] = comp
             elif type(comp) == plyj.InterfaceDeclaration:
                 subName, subImplements, subDecorators = getInterfaceScheme_helper(comp, self.solver, self.vManager)
                 depends = deferImplement_helper(self.vManager, subImplements)
@@ -309,19 +322,13 @@ class Compiler(object):
             elif type(comp) == plyj.ClassDeclaration:
                 subName, subImplements, subDecorators = getClassScheme_helper(comp, self.solver, self.vManager)
                 depends = deferImplement_helper(self.vManager, subImplements)
-                if  len(depends) > 0:
-                    self.classGraph[subName] = depends
-                    self.outsideClasses[subName] = comp
-                else:
-                    self.solver(comp)
+                self.classGraph[subName] = depends
+                self.outsideClasses[subName] = comp
             elif type(comp) == plyj.InterfaceDeclaration:
                 subName, subImplements, subDecorators = getInterfaceScheme_helper(comp, self.solver, self.vManager)
                 depends = deferImplement_helper(self.vManager, subImplements)
-                if  len(depends) > 0:
-                    self.classGraph[subName] = depends
-                    self.outsideClasses[subName] = comp
-                else:
-                    self.solver(comp)
+                self.classGraph[subName] = depends
+                self.outsideClasses[subName] = comp
             else:
                 self.solver(comp)
 
@@ -701,14 +708,7 @@ class Compiler(object):
         return variable, mtype
 
     def InstanceCreation(self, body, isAnonymous=False):
-        """
-        InstanceCreation(
-        type=Type(name=Name(value='java.util.ArrayList'), type_arguments=[Type(name=Name(value='android.widget.RemoteViews'), type_arguments=[], enclosed_in=None, dimensions=0)], enclosed_in=None, dimensions=0),
-        type_arguments=[],
-        arguments=[],
-        body=[],
-        enclosed_in=None)
-        """
+        collector = set()
         mtype = self.solver(body.type)
         self.usedName.add(mtype)
 
@@ -716,8 +716,10 @@ class Compiler(object):
         if  mtype == "Object":
             mtype = "object"
 
+
         args = []
         for arg in body.arguments:
+            arg = self.solver(arg)
             args.append(self.solver(arg))
         if  len(body.body) > 0: # anonymous function
             anonymous = AnonymousName_helper()
@@ -991,7 +993,7 @@ if __name__ == '__main__':
     
     root = "/Volumes/android/sdk-source-5.1.1_r1/frameworks/base/core/java"
     #inputPath = "/Volumes/android/sdk-source-5.1.1_r1/frameworks/base/core/java/android/text/style/CharacterStyle.java"
-    inputPath = "/Volumes/android/sdk-source-5.1.1_r1/frameworks/base/core/java/android/view/RenderNodeAnimator.java"
+    inputPath = "/Volumes/android/sdk-source-5.1.1_r1/frameworks/base/core/java/android/net/Uri.java"
     with open(inputPath, "r") as inputFd:
         compiler = Compiler(sys.stdout)
         print compiler.compilePackage(root, inputPath)
