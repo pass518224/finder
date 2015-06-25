@@ -1,6 +1,7 @@
 #! /usr/bin/env python2.7
 import logging
 import os
+import json
 
 import lib.Parse as Parse
 import lib.ProcessTable as PTable
@@ -45,6 +46,10 @@ def finder():
             except Transaction.TransactionError as e:
                 logger.warn("transaction error: " + e.args[0])
 
+    out = os.path.abspath(os.path.join(Config.Path.OUT, Config.System.VERSION, "Report"))
+    with open(out, "w") as outFd:
+        outFd.write("{}\n".format(json.dumps(tManager.solvingTable, indent=4, sort_keys=True)))
+        outFd.write(" Total: {}\n Solved: {}\n Solving Rate: {}\n".format(tManager.total, tManager.solved, float(tManager.solved)/float(tManager.total) * 100))
     #pTable.dumpTable()
 
 if __name__ == '__main__':

@@ -1,4 +1,6 @@
 import logging
+from collections import defaultdict
+
 import ProcessTable
 import Parcel
 import InterfaceLoader
@@ -24,6 +26,9 @@ hardwareDescriptors = [
     "drm.IDrmManagerService"
 ]
 
+DISCOVERED = "DISCOVERED"
+SOLVED = "SOLVED"
+
 
 class TransactionManager(object):
     """manage trnasactions, resolve and print out"""
@@ -34,6 +39,10 @@ class TransactionManager(object):
         self.transactions = []
         if  structureSolver is not None:
             self.sSolver = structureSolver
+
+        self.solvingTable = defaultdict(dict)
+        self.solved = 0
+        self.total = 0
 
     def addTransaction(self, transaction):
         try:
@@ -67,10 +76,19 @@ class TransactionManager(object):
                 return
             try:
                 code = self.iLoader.getCode(descriptor, tra.code)
+                if  descriptor in self.solvingTable and code in self.solvingTable[descriptor] and self.solvingTable[descriptor][code] == SOLVED:
+                    return 
+                elif descriptor in self.solvingTable and code in self.solvingTable[descriptor] and self.solvingTable[descriptor][code] == DISCOVERED:
+                    pass
+                else:
+                    self.total += 1
+                    self.solvingTable[descriptor][code] = DISCOVERED
                 print "=============================="
                 print "[{}]: {}".format(descriptor, code)
                 result = self.sSolver.solve(descriptor, code, tra.parcel)
-                if  result and result != True:
+                if  result:
+                    self.solved += 1
+                    self.solvingTable[descriptor][code] = SOLVED
                     print "\t" + result
             except InterfaceLoader.NoneExistCode as e:
                 logger.warn("missed transaction {}[{}]".format(descriptor, tra.code))

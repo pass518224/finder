@@ -56,5 +56,5 @@ class DeferClass(object):
         self.name = name
         self.mtype = mtype
         self.obj  = obj
-        self.VMsnapshot = VMsnapshot
+        self.snapshot = VMsnapshot
         

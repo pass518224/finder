@@ -101,6 +101,14 @@ class VariableManager(object):
             return True
         return False
 
+    def decorate(self, variable, SELF_INSTANCE):
+        """ decorate variable to fix its position, such as: ^self. , absolute member"""
+        if  self.isMember(variable):
+            return "{}.{}".format(SELF_INSTANCE, variable)
+        if  variable in self.current.globalAddress:
+            return self.current.globalAddress[variable]
+        return variable
+
     def findClass(self, clsName):
         if  clsName in self.classPaths:
             return self.classPaths[clsName]
@@ -129,7 +137,15 @@ class VariableManager(object):
             result += self._dump(v, level)
             result += "{}]\n".format(indent)
         return result
-
+    
+    def status(self):
+        result  = "========================================\n"
+        result += "Path: {}\n".format(self.getPath())
+        result += "callables: \n{}\n".format(json.dumps([i for i in self.current.callables], indent=4))
+        result += "variables: \n{}\n".format(json.dumps(self.current.variables, indent=4))
+        result += "globalAddress: \n{}\n".format(json.dumps(self.current.globalAddress, indent=4))
+        result += "========================================\n"
+        return result
 
     ##################################################
 

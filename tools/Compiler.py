@@ -154,6 +154,7 @@ class Compiler(object):
        
         while(not self.deferManager.isEmpty()):
             for cls in self.deferManager.sort():
+                self.vManager.setSnapshot(cls.snapshot)
                 if  cls.mtype == DeferClassManager.CLASS:
                     self.solver(cls.obj, absExtends=True)
                     self.p("{} = {}\n".format(self.vManager.findClass(cls.name), cls.name))
@@ -515,12 +516,8 @@ class Compiler(object):
         cases = []
         for case in body.cases:
             case = self.solver(case)
-            if  self.vManager.isMember(case):
-                cases.append("{}.{}".format(SELF_INSTANCE, case))
-            elif case in self.vManager.classPaths:
-                cases.append(self.vManager.classPaths[case])
-            else:
-                cases.append(case)
+            case = self.vManager.decorate(case, SELF_INSTANCE)
+            cases.append(case)
 
         if  cases[0] == "default":
             self.p("if mycase():\n", offset=-1)
@@ -670,8 +667,7 @@ class Compiler(object):
                 self.usedName.add(component)
         if  caller == "Type" :
             return value
-        if  self.vManager.isMember(value):
-            return "{}.{}".format(SELF_INSTANCE, value)
+        value = self.vManager.decorate(value, SELF_INSTANCE)
         return value
         
     @itemFilter
@@ -720,7 +716,6 @@ class Compiler(object):
             raise ClassOverriding(oClass, initializer)
         else:
             return "{}({})".format(mtype, ", ".join(args))
-            #return "{}{}({})".format(SELF_INSTANCE + "." if self.vManager.isMember(mtype) else "", mtype, ", ".join(args))
 
     @scoped
     def OverloadingInstance(self, variableDeclarator):
@@ -774,8 +769,7 @@ class Compiler(object):
         type_arguments = body.type_arguments
 
         if body.target is None:
-            if  self.vManager.isMember(name):
-                name = "{}.{}".format(SELF_INSTANCE, name)
+            name = self.vManager.decorate(name, SELF_INSTANCE)
             return "{name}({args})".format(name = name, args = ", ".join(args))
         
         targets = self.solver(body.target).split(".")
@@ -786,8 +780,8 @@ class Compiler(object):
 
         if targets[0] == "this":
             targets[0] = SELF_INSTANCE
-        elif self.vManager.isMember(targets[0]):
-            targets.insert(0, SELF_INSTANCE)
+        else:
+            targets[0] = self.vManager.decorate(targets[0], SELF_INSTANCE)
         return "{}.{}({})".format(".".join(keywordReplace_helper(i) for i in targets), name, ", ".join(args))
 
     def Wildcard(self, body):
