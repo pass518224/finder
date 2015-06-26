@@ -77,7 +77,7 @@ class TransactionManager(object):
             try:
                 code = self.iLoader.getCode(descriptor, tra.code)
                 if  descriptor in self.solvingTable and code in self.solvingTable[descriptor] and self.solvingTable[descriptor][code] == SOLVED:
-                    return 
+                    pass
                 elif descriptor in self.solvingTable and code in self.solvingTable[descriptor] and self.solvingTable[descriptor][code] == DISCOVERED:
                     pass
                 else:
@@ -87,8 +87,9 @@ class TransactionManager(object):
                 print "[{}]: {}".format(descriptor, code)
                 result = self.sSolver.solve(descriptor, code, tra.parcel)
                 if  result:
-                    self.solved += 1
-                    self.solvingTable[descriptor][code] = SOLVED
+                    if  self.solvingTable[descriptor][code] != SOLVED:
+                        self.solved += 1
+                        self.solvingTable[descriptor][code] = SOLVED
                     print "\t" + result
             except InterfaceLoader.NoneExistCode as e:
                 logger.warn("missed transaction {}[{}]".format(descriptor, tra.code))

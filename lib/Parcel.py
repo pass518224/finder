@@ -8,9 +8,21 @@ import base64
 from JavaUtils.String import String
 from JavaUtils.IBinder import IBinder
 from PersistableBundle import PersistableBundle
+from Bundle import Bundle
 
 logger = logging.getLogger(__name__)
 BYTE = 4
+
+def hook(func):
+    def hookFunction(self, *args, **kargs):
+        curframe = inspect.currentframe()
+        calframe = inspect.getouterframes(curframe, 1)
+        code = calframe[1][4][0].replace(' ', "").replace("\n", "")
+        print "module: {}:{}".format(calframe[1][1], calframe[1][2])
+        _result = func(self, *args, **kargs)
+        print "\t{}    #{}".format(code, _result)
+        return _result
+    return hookFunction
 
 class Parcel(object):
     """Parcel object to contain data"""
@@ -19,18 +31,22 @@ class Parcel(object):
         self.data = base64.b64decode(raw)
         self.offset = 0
 
+    @hook
     def enforceInterface(self, descriptor):
         policy = self.readInt()
         return self.readString()
 
+    @hook
     def readStrongBinder(self):
         return IBinder(self.readObject(False))
 
+    @hook
     def readObject(self, nullMetaData):
         self.offset += BYTE *4
         """ TODO """
         return "<<Strong binder>>"
 
+    @hook
     def readPersistableBundle(self, loader=None):
         length = self.readInt()
         if  length < 0:
@@ -43,12 +59,15 @@ class Parcel(object):
         return bundle
 
 
+    @hook
     def readByte(self):
         return self.readInt() & 0xff
 
+    @hook
     def readLong(self):
         return self.readInt64()
 
+    @hook
     def readInt(self):
         return self.readInt32()
 
@@ -70,6 +89,7 @@ class Parcel(object):
             return 0
             raise IllegalParcel(e.args[0], "data[0x{:x}:0x{:x}] : {}".format(offset, self.offset, self.data[offset:self.offset].encode("hex")))
 
+    @hook
     def readFloat(self):
         offset = self.offset
         self.offset += 4
@@ -79,16 +99,24 @@ class Parcel(object):
             return 0
             raise IllegalParcel(e.args[0], "data[0x{:x}:0x{:x}] : {}".format(offset, self.offset, self.data[offset:self.offset].encode("hex")))
 
-    def readBundle(self):
+    @hook
+    def readBundle(self, loader=None):
         length = self.readInt()
-        return "Bundle Object"
+        if  length < 0:
+            return None
+        bundle = Bundle(self, length)
+        if  loader != None:
+            bundle.setClassLoader(loader)
+        return bundle
         
+    @hook
     def readString(self):
         result = self.readString16()
         if  len(result) == 0:
             result = String("")
         return result
 
+    @hook
     def readStringArray(self):
         length = self.readInt()
         if  0 <= length:
@@ -96,6 +124,7 @@ class Parcel(object):
         else:
             return None
 
+    @hook
     def readStringList(self, arrayList):
         M = arrayList.size();
         N = self.readInt()
@@ -125,12 +154,14 @@ class Parcel(object):
             raise IllegalParcel("Offset out of bound.", "from offset: 0x{:x}, get length: {}, become: {}".format(offset, length, self.offset))
         return String(self.data[offset: self.offset].decode("utf16").encode("utf8").strip("\x00"))
 
+    @hook
     def readParcelable(self, loader):
         raise NoneImplementFunction("readParcelable")
         creator = self.readParcelableCreator(loader)
         if  creator == None:
             return None
 
+    @hook
     def readParcelableCreator(self, loader):
         name = self.readString()
         if  name == None:
@@ -143,6 +174,10 @@ class Parcel(object):
         self.offset = 0
         return descriptor
 
+    def getEncodedRaw(self):
+        return base64.b64encode(self.data)
+
+    @hook
     def createIntArray(self):
         length = self.readInt()
         if  0 <= length and length <= (( len(self.data) - self.offset) / 4):
@@ -150,6 +185,7 @@ class Parcel(object):
         else:
             return None
 
+    @hook
     def createStringArray(self):
         length = self.readInt()
         if  0 <= length:
@@ -157,11 +193,13 @@ class Parcel(object):
         else:
             return None
 
+    @hook
     def createTypedArrayList(self, creator):
         raise NoneImplementFunction(inspect.stack()[1][3])
         """TODO """
         return None
 
+    @hook
     def createTypedArray(self, creator):
         raise NoneImplementFunction(inspect.stack()[1][3])
         """TODO """

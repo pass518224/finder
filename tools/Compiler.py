@@ -404,11 +404,17 @@ class Compiler(object):
 
     def ConstructorInvocation(self, body):
         """docstring for ConstructorInvocation"""
+        logger.info( inspect.getouterframes(inspect.currentframe(), 2)[4][3])
+        logger.info(body)
+        logger.info(self.vManager.getPath())
+        paths = self.vManager.getPath().split(".")
+        funcName = paths[-1]
+        className = paths[-2]
         arguments = []
         for arg in body.arguments:
             sArg = self.solver(arg)
             arguments.append(sArg)
-        self.p("super({}.__class__, {}).__init__({})\n".format(SELF_INSTANCE, SELF_INSTANCE, ", ".join(arguments)))
+        self.p("super({}, {}).{}({})\n".format(className, SELF_INSTANCE, funcName, ", ".join(arguments)))
 
     def MethodDeclaration(self, body, appendName = False):
         """
@@ -979,7 +985,7 @@ if __name__ == '__main__':
     
     root = "/Volumes/android/sdk-source-5.1.1_r1/frameworks/base/core/java"
     #inputPath = "/Volumes/android/sdk-source-5.1.1_r1/frameworks/base/core/java/android/text/style/CharacterStyle.java"
-    inputPath = "/Volumes/android/sdk-source-5.1.1_r1/frameworks/base/core/java/android/net/Uri.java"
+    inputPath = "/Volumes/android/sdk-source-5.1.1_r1/frameworks/base/core/java/android/content/pm/ApplicationInfo.java"
     with open(inputPath, "r") as inputFd:
         compiler = Compiler(sys.stdout)
         print compiler.compilePackage(root, inputPath)
