@@ -87,6 +87,12 @@ class VariableManager(object):
             self.members[name] = self.getPath() + "." + name
             self.reversedMember[self.getPath() + "." + name] = name
 
+    def getType(self, vname):
+        """return variable type"""
+        if  vname not in self.current.variables:
+            raise Exception("None exist variables: {}".format(vname))
+        return self.current.variables[vname]
+
     def isMember(self, name):
         preClass = None
         for scope in reversed(self.path):
@@ -157,6 +163,9 @@ class VariableManager(object):
             self.globalAddress = {}
             self.variables = {}
             self.callables = {}
+
+            if  vtype == "ClassDeclaration":
+                self.variables["__class__"] = "dict"
 
         def isDeclared(self, name, type=None):
             if  type == CALLABLE and name in self.callables:

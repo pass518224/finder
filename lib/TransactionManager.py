@@ -41,8 +41,10 @@ class TransactionManager(object):
             self.sSolver = structureSolver
 
         self.solvingTable = defaultdict(dict)
-        self.solved = 0
         self.total = 0
+        self.solved = 0
+        self.eTotal = 0
+        self.eSolved = 0
 
     def addTransaction(self, transaction):
         try:
@@ -75,6 +77,7 @@ class TransactionManager(object):
             if  descriptor in hardwareDescriptors:
                 return
             try:
+                self.eTotal += 1
                 code = self.iLoader.getCode(descriptor, tra.code)
                 if  descriptor in self.solvingTable and code in self.solvingTable[descriptor] and self.solvingTable[descriptor][code] == SOLVED:
                     pass
@@ -87,6 +90,7 @@ class TransactionManager(object):
                 print "[{}]: {}".format(descriptor, code)
                 result = self.sSolver.solve(descriptor, code, tra.parcel)
                 if  result:
+                    self.eSolved += 1
                     if  self.solvingTable[descriptor][code] != SOLVED:
                         self.solved += 1
                         self.solvingTable[descriptor][code] = SOLVED

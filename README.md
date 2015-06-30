@@ -173,6 +173,35 @@ So we have to implement an adaptor to convert the type into corresponding functi
 
 #### Cycle import
 
+
+Limitation
+----
+
+#### Hardware RPC
+
+Most of Andoird PRC are constructed by Java code which was translated by AIDL or hand craft.
+
+Some of these are written directly with C/CPP and compile to a user space services.
+These kind of services and almost related to hardware control, Audio control. The differents
+between Java VM level serivces is the serices are written by C/CPP and directly run as a native 
+program without dalvik VM. Our work aim to focus Java-level serivces. So we still catch these 
+ICC transaction but filter out these kinds serivces. 
+
+We filter out these services while translating. Hard coded in `lib/TransactionManager.py`.
+
+#### From Java to Cpp code
+
+Finder does not handle the dependencies from Java VM to native CPP.
+
+For some performance concern or the need of low level operation, some Android functions
+implemented with C/CPP. The file `/frameworks/base/core/jni/android_os_Parcel.cpp` 
+descript the JNI interface. It connect Java function name to native function always 
+with prefix of **native[FUNCTION_NAME]**.
+
+As previous description. Finder handel only Java level services/program. If services 
+control-flow dependencies has these native functions, the Solveing of services will 
+stop.
+
 Related work
 ----
 

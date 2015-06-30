@@ -346,7 +346,6 @@ class Compiler(object):
 
     def ClassInitializer(self, body):
         return
-        logger.info(body)
         curframe = inspect.currentframe()
         calframe = inspect.getouterframes(curframe, 2)
         for i in range(2,8):
@@ -393,39 +392,26 @@ class Compiler(object):
         return "{}.{}".format(SELF_INSTANCE, self.solver(body.name))
 
     def ConstructorDeclaration(self, body, appendName = False):
-        """
-        name=<type 'str'>
-        block=<type 'list'>
-        type_parameters=<type 'list'>
-        parameters=<type 'list'>
-        """
+        body.name = "__init__"
+        if  appendName:
+            funcName = self._getOverrideName("__init__", body.parameters)
+            body.name = funcName
         setattr(body, "body", body.block)
-        self._classMethodDeclaration(body, appendName, functionName="__init__")
+        self._classMethodDeclaration(body)
 
     def ConstructorInvocation(self, body):
-        """docstring for ConstructorInvocation"""
-        logger.info( inspect.getouterframes(inspect.currentframe(), 2)[4][3])
-        logger.info(body)
-        logger.info(self.vManager.getPath())
-        paths = self.vManager.getPath().split(".")
-        funcName = paths[-1]
-        className = paths[-2]
         arguments = []
         for arg in body.arguments:
             sArg = self.solver(arg)
             arguments.append(sArg)
-        self.p("super({}, {}).{}({})\n".format(className, SELF_INSTANCE, funcName, ", ".join(arguments)))
+        self.p("{}.__init__({})\n".format(SELF_INSTANCE, ", ".join(arguments)))
 
     def MethodDeclaration(self, body, appendName = False):
-        """
-        name=<type 'str'>
-        type_parameters=<type 'list'>
-        parameters=<type 'list'>
-        return_type=<type 'str'>
-        body=<type 'list'>
-        abstract=<type 'bool'>
-        """
-        self._classMethodDeclaration(body, appendName)
+        name = self.solver(body.name)
+        if  appendName:
+            funcName = self._getOverrideName(name, body.parameters)
+            body.name = funcName
+        self._classMethodDeclaration(body)
 
     @scoped
     def EnumDeclaration(self, body):
@@ -440,29 +426,33 @@ class Compiler(object):
         name = self.solver(body.name)
         self.p("{name} = \"{name}\"\n".format(name=name))
 
-    @scoped
-    def _classMethodDeclaration(self, body, appendName = False, functionName = None):
-
-        if  not functionName:
-            functionName = self.solver(body.name)
-            if  functionName == "main":
-                self.mainFunction = self.vManager.getPath()
-            elif functionName == "toString":
-                functionName = "__str__"
-        args = [SELF_INSTANCE]
+    def _getOverrideName(self, funcName, parameters):
         args_type = []
+        for arg in parameters:
+            name, mtype = self.solver(arg)
+            args_type.append(mtype.split(".")[-1]) # get the last type name of parameters
+        return self._overrideName(funcName, args_type)
+
+
+    def _overrideName(self, funcName, args_type):
+        return "Oed_{}__{}".format(funcName, "__".join(args_type))
+
+    @scoped
+    def _classMethodDeclaration(self, body):
+
+        functionName = self.solver(body.name)
+        if  functionName == "main":
+            self.mainFunction = self.vManager.getPath()
+        elif functionName == "toString":
+            functionName = "__str__"
+
+        args = [SELF_INSTANCE]
         for arg in body.parameters:
             name, mtype = self.solver(arg)
             args.append(name)
-            args_type.append(mtype)
 
         self.p("@classmethod\n", offset=-1)
-        if  appendName: # function overriding
-            self.p("def Oed_{}__{}({}):\n".format(functionName,
-                "__".join([arg.split(".")[-1] for arg in args_type]),
-                ", ".join(args)), offset = -1)
-        else:
-            self.p("def {}({}):\n".format(functionName, ", ".join(args)), offset = -1)
+        self.p("def {}({}):\n".format(functionName, ", ".join(args)), offset = -1)
 
         if  not body.body or len(body.body) == 0:
             self.p("pass\n")
@@ -764,6 +754,8 @@ class Compiler(object):
         name = self.solver(body.name)
         if  name == "toString":
             name = "__str__"
+        elif name == "getClassLoader" or name == "getClass":
+            return "{}.__class__".format(SELF_INSTANCE)
 
         arguments = body.arguments
         args = []
@@ -786,6 +778,9 @@ class Compiler(object):
 
         if targets[0] == "this":
             targets[0] = SELF_INSTANCE
+        elif targets[0] == "super":
+            clsName = self.vManager.getPath().split(".")[-2]
+            targets[0] = "super({}, {})".format(clsName, SELF_INSTANCE)
         else:
             targets[0] = self.vManager.decorate(targets[0], SELF_INSTANCE)
         return "{}.{}({})".format(".".join(keywordReplace_helper(i) for i in targets), name, ", ".join(args))
@@ -951,9 +946,9 @@ class Compiler(object):
         for method in overloading:
             self.p("\n")
             self.p("@classmethod\n")
-            self.p("def {}(self, *args):\n".format(method))
+            self.p("def {}({}, *args):\n".format(method, SELF_INSTANCE))
             self.p("    fname = \"Oed_{}__\" + \"__\".join(i.__class__.__name__ for i in args)\n".format(method))
-            self.p("    func = getattr(self, fname)\n")
+            self.p("    func = getattr({}, fname)\n".format(SELF_INSTANCE))
             self.p("    return func(*args)\n")
 
          
@@ -985,7 +980,7 @@ if __name__ == '__main__':
     
     root = "/Volumes/android/sdk-source-5.1.1_r1/frameworks/base/core/java"
     #inputPath = "/Volumes/android/sdk-source-5.1.1_r1/frameworks/base/core/java/android/text/style/CharacterStyle.java"
-    inputPath = "/Volumes/android/sdk-source-5.1.1_r1/frameworks/base/core/java/android/content/pm/ApplicationInfo.java"
+    inputPath = "/Volumes/android/sdk-source-5.1.1_r1/frameworks/base/core/java/android/os/Message.java"
     with open(inputPath, "r") as inputFd:
         compiler = Compiler(sys.stdout)
         print compiler.compilePackage(root, inputPath)

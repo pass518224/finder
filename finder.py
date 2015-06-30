@@ -49,6 +49,9 @@ def finder():
     out = os.path.abspath(os.path.join(Config.Path.OUT, Config.System.VERSION, "Report"))
     with open(out, "w") as outFd:
         outFd.write("{}\n".format(json.dumps(tManager.solvingTable, indent=4, sort_keys=True)))
+        outFd.write("\n{}\n=========================\n".format("Solving Rate"))
+        outFd.write(" Total: {}\n Solved: {}\n Solving Rate: {}\n".format(tManager.eTotal, tManager.eSolved, float(tManager.eSolved)/float(tManager.eTotal) * 100))
+        outFd.write("\n{}\n=========================\n".format("coverage"))
         outFd.write(" Total: {}\n Solved: {}\n Solving Rate: {}\n".format(tManager.total, tManager.solved, float(tManager.solved)/float(tManager.total) * 100))
     #pTable.dumpTable()
 

@@ -26,9 +26,10 @@ class Includer(object):
         for file in os.listdir(self.current):
             if  file.endswith(".java"):
                 cls = file[:-5]
-                abspath = absjoin(self.current, file)
-                self.packages = cls
-                self.include(cls, abspath)
+                if  cls != self.myName:
+                    abspath = absjoin(self.current, file)
+                    self.packages = cls
+                    self.include(cls, abspath)
         
     def addImport(self, pkg, isStatic):
         if  isStatic:

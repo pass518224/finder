@@ -50,7 +50,7 @@ class Parcel(object):
     def readPersistableBundle(self, loader=None):
         length = self.readInt()
         if  length < 0:
-            return null
+            return None
 
         bundle = PersistableBundle(self, length)
         if  loader != None:
@@ -112,8 +112,6 @@ class Parcel(object):
     @hook
     def readString(self):
         result = self.readString16()
-        if  len(result) == 0:
-            result = String("")
         return result
 
     @hook
@@ -144,8 +142,8 @@ class Parcel(object):
 
     def readString16(self):
         length = self.readInt32()
-        if  length == 0:
-            return String("")
+        if  length < 0:
+            return None
         length += 1
         offset = self.offset
         self.offset += length*2
