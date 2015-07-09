@@ -671,7 +671,7 @@ if __name__ == '__main__':
         translator(inputFd, sys.stdout)
     """
 
-    sourcePath = Config.Path._IINTERFACE
+    sourcePath = os.path.join( Config.Path._IINTERFACE, Config.System.VERSION)
     outputPath = os.path.join(Config.Path.OUT, Config.System.VERSION, "stub")
     if not os.path.exists(outputPath):
         os.makedirs(outputPath)

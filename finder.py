@@ -16,7 +16,7 @@ import tools.Config as Config
 
 def finder():
     """entry function"""
-    path = os.path.join(Config.Path.PROJECT, 'sample', '5.1.2log')
+    path = os.path.join(Config.Path.PROJECT, 'sample', 'BusTaipei')
     fd = open(path, "r")
     sys_log = Parse.Parser(fd)
 

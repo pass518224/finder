@@ -478,6 +478,13 @@ class Compiler(object):
         result = result.replace("\"", "'")
         self.p("raise Exception(\"{}\")\n".format(result))
 
+    def Throws(self, body):
+        throws = []
+        for mtype in body.types:
+            throws.append(self.solver(mtype))
+        return throws
+
+
     #@scoped
     def Synchronized(self, body):
         #self.p("synchronized({})\n".format(body.monitor), offset=-1)
@@ -627,6 +634,9 @@ class Compiler(object):
 
     def Return(self, body):
         return "return {}".format(self.solver(body.result))
+
+    def Annotation(self, body):
+        return self.solver(body.name)
 
     def Type(self, body):
         tArgs = []

@@ -213,3 +213,4 @@ Dependencies
 ----
 
 + [plyj](https://github.com/musiKk/plyj)
++ [simplejson](https://pypi.python.org/pypi/simplejson/)

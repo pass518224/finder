@@ -22,6 +22,7 @@ class Path(Config):
     _STUB        = path.abspath(path.join( PROJECT, "_Stub" ))
     _NATIVE_STUB = path.abspath(path.join( PROJECT, "_NativeStub" ))
     OUT          = path.abspath(path.join( PROJECT, "out" ))
+    EVAL         = path.abspath(path.join( OUT, "evaluation" ))
 
 
 class System(Config):
@@ -36,7 +37,7 @@ class System(Config):
     JAVA_MEDIA     = path.abspath(path.join(WORKINGDIR, "frameworks/base/media/java/"))
     JAVA_LOCATION  = path.abspath(path.join(WORKINGDIR, "frameworks/base/location/java/"))
     JAVA_LIBS      = [JAVA_POOL, JAVA_GRAPHIC, JAVA_TELECOMM, JAVA_TELEPHONY, JAVA_MEDIA, JAVA_LOCATION]
-    AIDL_CACHE     = path.abspath(path.join(WORKINGDIR, "out/target/common/obj/JAVA_LIBRARIES/framework_intermediates/"))
+    AIDL_CACHE     = path.abspath(path.join(WORKINGDIR, "out/target/common/obj/JAVA_LIBRARIES/"))
 
     manifest_root = ElementTree.parse(path.join(WORKINGDIR, '.repo/manifest.xml')).getroot()
     VERSION = manifest_root.find('default').attrib["revision"].split("/")[-1]

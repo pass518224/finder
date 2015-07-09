@@ -29,6 +29,15 @@ def fileWalker(travelPath, excludePattern, includePattern):
         result += files
     return result
 
+def recursiveCopy(source, target, excludePattern, includePattern):
+    for file in fileWalker(source, excludePattern, includePattern):
+        with open(file, "r") as fd:
+            buf = fd.read()
+            if  buf.find("extends IInterface") > 0 or buf.find("extends android.os.IInterface") > 0:
+                t_file = file.split("/")[-1]
+                shutil.copyfile(file, os.path.join(target, t_file))
+                logger.info(" o {}".format(file))
+
 
 if __name__ == '__main__':
     logging.basicConfig(level = logging.DEBUG)
@@ -38,24 +47,12 @@ if __name__ == '__main__':
 
     framework = Config.System.FRAMEWORK
     aidl      = Config.System.AIDL_CACHE
-    interface = Config.Path._IINTERFACE
+    interface = os.path.join( Config.Path._IINTERFACE, Config.System.VERSION)
     if not os.path.exists(interface):
         os.makedirs(interface)
 
-    logger.info("Collecting system lovel interface: ")
-    for file in fileWalker(framework, excludePattern, includePattern):
-        with open(file, "r") as fd:
-            buf = fd.read()
-            if  buf.find("extends IInterface") > 0 or buf.find("extends android.os.IInterface") > 0:
-                t_file = file.split("/")[-1]
-                shutil.copyfile(file, os.path.join(interface, t_file))
-                logger.info("Matched file: [{}]".format(file))
+    logger.info("Collecting system level interface: ")
+    recursiveCopy(framework, interface, excludePattern, includePattern)
                 
     logger.info("Collecting AIDL interface: ")
-    for file in fileWalker(aidl, excludePattern, ["*.java"]):
-        with open(file, "r") as fd:
-            buf = fd.read()
-            if  buf.find("extends IInterface") > 0 or buf.find("extends android.os.IInterface") > 0:
-                t_file = file.split("/")[-1]
-                shutil.copyfile(file, os.path.join(interface, t_file))
-                logger.info("Matched file: [{}]".format(file))
+    recursiveCopy(aidl, interface, excludePattern, ["*.java"])
