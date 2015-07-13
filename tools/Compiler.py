@@ -21,7 +21,7 @@ import Config
 
 logger = logging.getLogger(__name__)
 
-INITIAL_CLASS = "object"
+INITIAL_CLASS = "BasicObject"
 SELF_INSTANCE = "_SELF"
 
 """ decorators """
@@ -180,6 +180,7 @@ class Compiler(object):
             
         builtinImports = [
             "from lib.Switch import Switch\n",
+            "from lib.BasicObject import BasicObject\n",
         ]
         prefix = "".join(builtinImports) + "".join(["from {} import *\n".format(pkg) for pkg in dependsPkgs])
         return prefix + result
@@ -404,7 +405,9 @@ class Compiler(object):
         for arg in body.arguments:
             sArg = self.solver(arg)
             arguments.append(sArg)
-        self.p("{}.__init__({})\n".format(SELF_INSTANCE, ", ".join(arguments)))
+
+        clsName = self.vManager.getPath().split(".")[-2]
+        self.p("{}({})\n".format(clsName, ", ".join(arguments)))
 
     def MethodDeclaration(self, body, appendName = False):
         name = self.solver(body.name)
@@ -443,8 +446,10 @@ class Compiler(object):
         functionName = self.solver(body.name)
         if  functionName == "main":
             self.mainFunction = self.vManager.getPath()
+        """
         elif functionName == "toString":
             functionName = "__str__"
+        """
 
         args = [SELF_INSTANCE]
         for arg in body.parameters:
@@ -708,7 +713,7 @@ class Compiler(object):
 
         #built-in types
         if  mtype == "Object":
-            mtype = "object"
+            mtype = INITIAL_CLASS
 
 
         args = []
@@ -762,9 +767,7 @@ class Compiler(object):
     @JavaLib.method
     def MethodInvocation(self, body):
         name = self.solver(body.name)
-        if  name == "toString":
-            name = "__str__"
-        elif name == "getClassLoader" or name == "getClass":
+        if name == "getClassLoader" or name == "getClass":
             return "{}.__class__".format(SELF_INSTANCE)
 
         arguments = body.arguments
@@ -953,12 +956,13 @@ class Compiler(object):
 
     def overloadEntry(self, overloading):
         self.c("Overloading Entries")
+        clsName = self.vManager.getPath()
         for method in overloading:
             self.p("\n")
             self.p("@classmethod\n")
             self.p("def {}({}, *args):\n".format(method, SELF_INSTANCE))
             self.p("    fname = \"Oed_{}__\" + \"__\".join(i.__class__.__name__ for i in args)\n".format(method))
-            self.p("    func = getattr({}, fname)\n".format(SELF_INSTANCE))
+            self.p("    func = getattr({}, fname)\n".format(clsName))
             self.p("    return func(*args)\n")
 
          
@@ -990,7 +994,7 @@ if __name__ == '__main__':
     
     root = "/Volumes/android/sdk-source-5.1.1_r1/frameworks/base/core/java"
     #inputPath = "/Volumes/android/sdk-source-5.1.1_r1/frameworks/base/core/java/android/text/style/CharacterStyle.java"
-    inputPath = "/Volumes/android/sdk-source-5.1.1_r1/frameworks/base/core/java/android/os/Message.java"
+    inputPath = "/Volumes/android/sdk-source-5.1.1_r1/frameworks/base/telecomm/java/android/telecom/PhoneAccountHandle.java"
     with open(inputPath, "r") as inputFd:
         compiler = Compiler(sys.stdout)
         print compiler.compilePackage(root, inputPath)

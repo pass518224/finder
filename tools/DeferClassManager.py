@@ -21,7 +21,7 @@ class DeferClassManager(object):
         self.classes = {}
 
     def addClass(self, name, dependency, body):
-        logger.debug("add ANONY_CLASS:{} => {}".format(name, dependency))
+        logger.debug("add CLASS:{} => {}".format(name, dependency))
         self.classGraph[name] = dependency
         self.classes[name] = DeferClass(name, CLASS, body, self.vManager.snapshot())
 

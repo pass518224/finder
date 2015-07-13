@@ -24,7 +24,7 @@ class Stub(object):
             logger.warn(e)
             return "Unfound creator: {}".format(name)
         """
-        getattr(creator, className).CREATOR.createFromParcel(*args)
+        result = getattr(creator, className).CREATOR.createFromParcel(*args)
 
         return "creator of [{}]".format(creator)
 
@@ -39,8 +39,6 @@ class Stub(object):
     def newInstance(self, name, *args):
         print name
         raise CallCreator("new instance")
-        """docstring for newInstance"""
-        pass
 
     def callFunction(self, funName, *args, **kargs):
         return "{}({})".format(funName, ", ".join(str(i) for i in args))

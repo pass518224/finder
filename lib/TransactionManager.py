@@ -87,7 +87,7 @@ class TransactionManager(object):
                     self.total += 1
                     self.solvingTable[descriptor][code] = DISCOVERED
                 print "=============================="
-                print "[{}]: {}".format(descriptor, code)
+                print "#{} {} ==> {} / [{}]: {}".format(tra.debug_id, tra.from_proc_name, tra.to_proc_name, descriptor, code)
                 result = self.sSolver.solve(descriptor, code, tra.parcel)
                 if  result:
                     self.eSolved += 1

@@ -14,6 +14,7 @@ logger = logging.getLogger(__name__)
 BYTE = 4
 
 def hook(func):
+    return func
     def hookFunction(self, *args, **kargs):
         curframe = inspect.currentframe()
         calframe = inspect.getouterframes(curframe, 1)
