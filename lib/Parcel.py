@@ -10,12 +10,16 @@ from JavaUtils.IBinder import IBinder
 from PersistableBundle import PersistableBundle
 from Bundle import Bundle
 
+import tools.Config as Config
+
 logger = logging.getLogger(__name__)
 BYTE = 4
 
 def hook(func):
-    return func
     def hookFunction(self, *args, **kargs):
+        if  not Config.DEBUG:
+            _result = func(self, *args, **kargs)
+            return _result
         curframe = inspect.currentframe()
         calframe = inspect.getouterframes(curframe, 1)
         code = calframe[1][4][0].replace(' ', "").replace("\n", "")

@@ -4,6 +4,8 @@ from os import path
 from xml.etree import ElementTree
 import os
 
+DEBUG = False
+
 class Config(object):
     def __init__(self):
         pass
@@ -41,6 +43,8 @@ class System(Config):
 
     manifest_root = ElementTree.parse(path.join(WORKINGDIR, '.repo/manifest.xml')).getroot()
     VERSION = manifest_root.find('default').attrib["revision"].split("/")[-1]
+
+DEBUG = False
         
         
 

@@ -64,4 +64,6 @@ if __name__ == '__main__':
     parser.add_argument("input", type=file, nargs="?", help="ICC log file.", default=sys.stdin)
     parser.add_argument("-d", "--debug", action="store_true", help="enable debug trace", default=False)
     args = parser.parse_args()
+    Config.DEBUG = args.debug
+    
     finder(args.input)

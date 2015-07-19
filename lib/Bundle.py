@@ -8,6 +8,7 @@ class BaseBundle(object):
             mParcelledData = "empty_parcel"
 
         magic = parcel.readInt();
+        #print parcel.data[offset:offset+length]
         parcel.offset += length
         """ TODO """
         
