@@ -2,6 +2,8 @@
 import logging
 import os
 import json
+import argparse
+import sys
 
 import lib.Parse as Parse
 import lib.ProcessTable as PTable
@@ -14,11 +16,8 @@ import lib.StructureSolver as StructureSolver
 
 import tools.Config as Config
 
-def finder():
+def finder(fd):
     """entry function"""
-    #path = os.path.join(Config.Path.PROJECT, 'sample', '5.1.2log-short')
-    path = os.path.join(Config.Path.PROJECT, 'sample', '5.1.2_log')
-    fd = open(path, "r")
     sys_log = Parse.Parser(fd)
 
     #process related
@@ -60,4 +59,9 @@ if __name__ == '__main__':
     #logging.basicConfig(level = logging.DEBUG)
     logging.basicConfig(level = logging.INFO)
     logger = logging.getLogger(__name__)
-    finder()
+
+    parser = argparse.ArgumentParser(description="finder - Android ICC parser")
+    parser.add_argument("input", type=file, nargs="?", help="ICC log file.", default=sys.stdin)
+    parser.add_argument("-d", "--debug", action="store_true", help="enable debug trace", default=False)
+    args = parser.parse_args()
+    finder(args.input)
