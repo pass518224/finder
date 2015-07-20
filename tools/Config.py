@@ -59,14 +59,15 @@ def parse(fd):
     count = 0
     for line in raw.split("\n"):
         count += 1
-        if  line[0] == "#":
+        if  line.startswith("#"):
             continue
-        line = line.strip(' ')
-        try:
-            key, val = line.split("=")
-        except:
-            raise Exception("Must satisfy format [key]=[val], error at line: {}".format(count))
-        result[key] = val
+        if  len(line) > 0:
+            line = line.strip(' ')
+            try:
+                key, val = line.split("=")
+            except:
+                raise Exception("Must satisfy format [key]=[val], error at line: {}".format(count))
+            result[key] = val
     return result
 
 Path = PathInfo()
