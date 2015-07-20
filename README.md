@@ -17,6 +17,35 @@ to translate the ICC data, raw-byte, into data structures, human-readable.
 These data structures are also useful for forensic and static analysis.
 
 
+Usage
+----
+
+> usage: finder.py [-h] [-d] [input]
+> 
+> finder - Android ICC parser
+> 
+> positional arguments:
+>   input        ICC log file.
+> 
+> optional arguments:
+>   -h, --help   show this help message and exit
+>   -d, --debug  enable debug trace
+
+Finder need android repo which compiled from android java source code for solving transaction data.
+
+Download the repo for your coresponding version of Android
+
+> I put the repo at the directly `repo`
+
+create the destination directory to put repo
+
+    mkdir out
+    cp repo/android-5.1.1_r1.tar.gz out
+    cd out
+    tar zxvf android-5.1.1_r1.tar.gz
+    cd ..
+
+Now your Finder is support version 5.1.1!
 
 Tools
 ----
