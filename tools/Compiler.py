@@ -709,7 +709,7 @@ class Compiler(object):
     def InstanceCreation(self, body, isAnonymous=False):
         collector = set()
         mtype = self.solver(body.type)
-        self.usedName.add(mtype)
+        map(self.usedName.add, mtype.split("."))
 
         #built-in types
         if  mtype == "Object":
@@ -767,8 +767,6 @@ class Compiler(object):
     @JavaLib.method
     def MethodInvocation(self, body):
         name = self.solver(body.name)
-        if name == "getClassLoader" or name == "getClass":
-            return "{}.__class__".format(SELF_INSTANCE)
 
         arguments = body.arguments
         args = []
@@ -993,8 +991,8 @@ if __name__ == '__main__':
     logging.basicConfig(level = logging.INFO)
     
     root = "/Volumes/android/sdk-source-5.1.1_r1/frameworks/base/core/java"
-    #inputPath = "/Volumes/android/sdk-source-5.1.1_r1/frameworks/base/core/java/android/text/style/CharacterStyle.java"
-    inputPath = "/Volumes/android/sdk-source-5.1.1_r1/frameworks/base/telecomm/java/android/telecom/PhoneAccountHandle.java"
+    inputPath = "/Volumes/android/sdk-source-5.1.1_r1/frameworks/base/core/java/android/os/StrictMode.java"
+    # inputPath = "/Volumes/android/sdk-source-5.1.1_r1/frameworks/base/telecomm/java/android/telecom/PhoneAccountHandle.java"
     with open(inputPath, "r") as inputFd:
         compiler = Compiler(sys.stdout)
         print compiler.compilePackage(root, inputPath)

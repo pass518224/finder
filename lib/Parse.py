@@ -72,6 +72,8 @@ class Parser(Iterator):
                     continue
                 
                 info = infoCreator(raw)
+                if  "length" in info and info["length"] == "0":
+                    continue
                 if len(info) < 1:
                     print "asfasdfjaklsfjakljfakldklajkl"
                 info["type"] = type

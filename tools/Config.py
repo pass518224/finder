@@ -34,19 +34,19 @@ class SystemInfo(Config):
             self.configure()
 
     def configure(self):
-        self.FRAMEWORK      = path.abspath(path.join(WORKINGDIR, "frameworks"))
-        self.LIBCORE        = path.abspath(path.join(WORKINGDIR, "libcore/luni/src/main/java/libcore/"))
-        self.LIBJAVA        = path.abspath(path.join(WORKINGDIR, "libcore/luni/src/main/java/java/"))
-        self.JAVA_POOL      = path.abspath(path.join(WORKINGDIR, "frameworks/base/core/java/"))
-        self.JAVA_GRAPHIC   = path.abspath(path.join(WORKINGDIR, "frameworks/base/graphics/java/"))
-        self.JAVA_TELECOMM  = path.abspath(path.join(WORKINGDIR, "frameworks/base/telecomm/java/"))
-        self.JAVA_TELEPHONY = path.abspath(path.join(WORKINGDIR, "frameworks/base/telephony/java/"))
-        self.JAVA_MEDIA     = path.abspath(path.join(WORKINGDIR, "frameworks/base/media/java/"))
-        self.JAVA_LOCATION  = path.abspath(path.join(WORKINGDIR, "frameworks/base/location/java/"))
-        self.JAVA_LIBS      = [JAVA_POOL, JAVA_GRAPHIC, JAVA_TELECOMM, JAVA_TELEPHONY, JAVA_MEDIA, JAVA_LOCATION]
-        self.AIDL_CACHE     = path.abspath(path.join(WORKINGDIR, "out/target/common/obj/JAVA_LIBRARIES/"))
+        self.FRAMEWORK      = path.abspath(path.join(self.WORKINGDIR, "frameworks"))
+        self.LIBCORE        = path.abspath(path.join(self.WORKINGDIR, "libcore/luni/src/main/java/libcore/"))
+        self.LIBJAVA        = path.abspath(path.join(self.WORKINGDIR, "libcore/luni/src/main/java/java/"))
+        self.JAVA_POOL      = path.abspath(path.join(self.WORKINGDIR, "frameworks/base/core/java/"))
+        self.JAVA_GRAPHIC   = path.abspath(path.join(self.WORKINGDIR, "frameworks/base/graphics/java/"))
+        self.JAVA_TELECOMM  = path.abspath(path.join(self.WORKINGDIR, "frameworks/base/telecomm/java/"))
+        self.JAVA_TELEPHONY = path.abspath(path.join(self.WORKINGDIR, "frameworks/base/telephony/java/"))
+        self.JAVA_MEDIA     = path.abspath(path.join(self.WORKINGDIR, "frameworks/base/media/java/"))
+        self.JAVA_LOCATION  = path.abspath(path.join(self.WORKINGDIR, "frameworks/base/location/java/"))
+        self.JAVA_LIBS      = [self.JAVA_POOL, self.JAVA_GRAPHIC, self.JAVA_TELECOMM, self.JAVA_TELEPHONY, self.JAVA_MEDIA, self.JAVA_LOCATION]
+        self.AIDL_CACHE     = path.abspath(path.join(self.WORKINGDIR, "out/target/common/obj/JAVA_LIBRARIES/"))
 
-        self.manifest_root = ElementTree.parse(path.join(WORKINGDIR, '.repo/manifest.xml')).getroot()
+        manifest_root = ElementTree.parse(path.join(self.WORKINGDIR, '.repo/manifest.xml')).getroot()
         self.VERSION= manifest_root.find('default').attrib["revision"].split("/")[-1]
 
     def setVersion(self, version):

@@ -1,4 +1,7 @@
 import logging
+import sys
+sys.path.append("/Users/lucas/finder/Creators")
+from android.os.StrictMode import StrictMode
 
 logger = logging.getLogger(__name__)
 
@@ -12,18 +15,8 @@ class Stub(object):
         to
         _arg0 = self.creatorResolver("android.media.AudioAttributes", data)
         """
-        import sys
-        sys.path.append("/Users/lucas/finder/Creators")
-
         className = name.split(".")[-1]
         creator = __import__(name, globals(), locals(), className)
-        """
-        try:
-            creator = __import__(name, globals(), locals(), className)
-        except ImportError as e:
-            logger.warn(e)
-            return "Unfound creator: {}".format(name)
-        """
         result = getattr(creator, className).CREATOR.createFromParcel(*args)
 
         return "creator of [{}]".format(creator)
@@ -37,8 +30,11 @@ class Stub(object):
         return "solved interface of [{}]".format(name)
 
     def newInstance(self, name, *args):
-        print name
-        raise CallCreator("new instance")
+        if  len(args) == 0:
+            return object()
+        if  name == "StrictMode.ViolationInfo":
+            return StrictMode.ViolationInfo(*args)
+        raise CallCreator("new instance with name: {}({})".format(name, [str(type(i)) for i in args]))
 
     def callFunction(self, funName, *args, **kargs):
         return "{}({})".format(funName, ", ".join(str(i) for i in args))

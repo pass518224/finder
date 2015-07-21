@@ -32,9 +32,11 @@ def hook(func):
 class Parcel(object):
     """Parcel object to contain data"""
     def __init__(self, raw):
-        super(Parcel, self).__init__()
         self.data = base64.b64decode(raw)
         self.offset = 0
+
+    def setData(self, data):
+        self.data = data
 
     @hook
     def enforceInterface(self, descriptor):
@@ -159,7 +161,7 @@ class Parcel(object):
 
     @hook
     def readParcelable(self, loader):
-        raise NoneImplementFunction("readParcelable")
+        raise NoneImplementFunction("readParcelable loader:{}".format(loader))
         creator = self.readParcelableCreator(loader)
         if  creator == None:
             return None
@@ -198,20 +200,41 @@ class Parcel(object):
 
     @hook
     def createTypedArrayList(self, creator):
-        raise NoneImplementFunction(inspect.stack()[1][3])
-        """TODO """
-        return None
+        if  type(creator) == str:
+            print creator
+        n = self.readInt()
+        if  n < 0:
+            return None
+
+        I = list()
+        while n > 0:
+            if  self.readInt() != 0:
+                I.append(creator.createFromParcel(self))
+            else:
+                I.append(null)
+            n -= 1
+        return I
 
     @hook
     def createTypedArray(self, creator):
-        raise NoneImplementFunction(inspect.stack()[1][3])
-        """TODO """
-        return None
+        n = self.readInt()
+        if  n < 0:
+            return None
+
+        I = [None]*n
+        for i in range(n):
+            if  self.readInt() != 0:
+                I[i] = creator.createFromParcel(self)
+        return I
 
     """
     reply functions
     #! ideally, not used
     """
+
+    def hasFileDescriptors(self):
+        """docstring for ha"""
+        pass
 
     def writeNoException(self):
         return

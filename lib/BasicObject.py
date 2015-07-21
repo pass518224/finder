@@ -1,10 +1,12 @@
 class BasicObject(object):
 
+    """
     def __str__(self):
         return self.dump()
 
     def __repr__(self):
         return self.dump()
+    """
         
     def dump(self):
         result = "Class name : " + self.__class__.__name__
