@@ -1,4 +1,4 @@
-#! /usr/bin/env python2.7 -W ignore
+#!/usr/bin/env python2.7 
 import logging
 import os
 import json
