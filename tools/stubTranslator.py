@@ -8,6 +8,7 @@ import json
 from os import path
 
 import Config
+import Selector
 
 logger = logging.getLogger(__name__)
 
@@ -159,6 +160,7 @@ class Compiler(object):
         for searchPath in self.dependencyPaths:
             files = os.listdir(searchPath)
             if  filename + ".java" in files:
+                logger.info(name)
                 logger.info("Solving interface: [{}]".format(filename))
                 parser = plyj.Parser()
                 root = parser.parse_file(os.path.join(searchPath, filename + ".java"))
@@ -488,7 +490,12 @@ class Compiler(object):
             return "return {target}.callFunction({args})".format(target = target, args = ", ".join(i for i in args))
 
         if body.target is None:
-            return "{name}({args})".format(name = name, args = ", ".join(i for i in args))
+            if  name in exitFunctions:
+                args.insert(0, "\"{}\"".format(name))
+                self.stopTranslate = True
+                return "return self.callFunction({})".format(", ".join(i for i in args))
+            else:
+                return "{name}({args})".format(name = name, args = ", ".join(i for i in args))
         target = self.solver(body.target)
 
         if target == "super":
@@ -654,7 +661,8 @@ def translator(inputFd, outputFd):
     root = parser.parse_file(inputFd)
 
     #compiler = Compiler(outputFd)
-    compiler = Compiler(fd = outputFd, dependencyPaths = [Config.Path._IINTERFACE])
+    search = os.path.join(Config.Path._IINTERFACE, Config.System.VERSION)
+    compiler = Compiler(fd = outputFd, dependencyPaths = [search])
     compiler.header()
     compiler.compile(root)
 
@@ -666,7 +674,12 @@ if __name__ == '__main__':
 
     
     """
-    inputPath = "/Users/lucas/finder/_NativeStub/android-5.1.1_r1/ApplicationThreadNative.java"
+    exitFunctions = set()
+    inputPath = os.path.join( Config.Path._NATIVE_STUB, Config.System.VERSION, "ActivityManagerNative.java")
+    nativeMethodPath = "ClassDeclaration[name$=Proxy]>MethodDeclaration[throws*=RemoteException]"
+    result = Selector.Selector(inputPath).query(nativeMethodPath)
+    for item in result:
+        exitFunctions.add(item.name)
     with open(inputPath, "r") as inputFd:
         translator(inputFd, sys.stdout)
     """
@@ -678,6 +691,7 @@ if __name__ == '__main__':
 
     for file in os.listdir(sourcePath):
         inputFile = os.path.join(sourcePath, file)
+        exitFunctions = set()
         outputFile = os.path.join(outputPath, ".".join(file.split(".")[:-1])+".py")
         with open(inputFile, "r") as inputFd, open(outputFile, "w") as outputFd:
             logger.info("parsing file: [{}]".format(file))
@@ -690,6 +704,11 @@ if __name__ == '__main__':
     sourcePath = os.path.join(Config.Path._NATIVE_STUB, Config.System.VERSION)
     for file in os.listdir(sourcePath):
         inputFile = os.path.join(sourcePath, file)
+        exitFunctions = set()
+        nativeMethodPath = "ClassDeclaration[name$=Proxy]>MethodDeclaration[throws*=RemoteException]"
+        result = Selector.Selector(inputFile).query(nativeMethodPath)
+        for item in result:
+            exitFunctions.add(item.name)
         outputFile = os.path.join(outputPath, ".".join(file.split(".")[:-1])+".py")
         with open(inputFile, "r") as inputFd, open(outputFile, "w") as outputFd:
             logger.info("parsing file: [{}]".format(file))

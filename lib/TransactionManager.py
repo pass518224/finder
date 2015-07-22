@@ -29,6 +29,8 @@ hardwareDescriptors = [
 DISCOVERED = "DISCOVERED"
 SOLVED = "SOLVED"
 
+UNKNOWN_NAME = "[????]"
+
 
 class TransactionManager(object):
     """manage trnasactions, resolve and print out"""
@@ -46,24 +48,28 @@ class TransactionManager(object):
         self.eTotal = 0
         self.eSolved = 0
 
+        self.filter = None
+
     def addTransaction(self, transaction):
         try:
             (pName, pType) = self.processTable.getNameFromPid(transaction.from_proc)
             setattr(transaction, "from_proc_name", pName)
         except ProcessTable.NoneExistPid:
-            setattr(transaction, "from_proc_name", "[????]")
+            setattr(transaction, "from_proc_name", UNKNOWN_NAME)
         try:
             (tName, tType) = self.processTable.getNameFromPid(transaction.from_thread)
             setattr(transaction, "from_thread_name", tName)
         except ProcessTable.NoneExistPid:
-            setattr(transaction, "from_thread_name",  "[????]")
+            setattr(transaction, "from_thread_name", UNKNOWN_NAME)
         try:
             (fName, fType) = self.processTable.getNameFromPid(transaction.to_proc)
             setattr(transaction, "to_proc_name", fName)
         except ProcessTable.NoneExistPid:
-            setattr(transaction, "to_proc_name", "[????]")
+            setattr(transaction, "to_proc_name", UNKNOWN_NAME)
         self.transactions.append(transaction)
-        self.solve(transaction)
+        
+    def registFilter(self, filter):
+        self.filter = filter
 
     def solve(self, tra):
         if  tra.type == "BC_TRANSACTION":
@@ -77,8 +83,10 @@ class TransactionManager(object):
             if  descriptor in hardwareDescriptors:
                 return
             try:
-                self.eTotal += 1
                 code = self.iLoader.getCode(descriptor, tra.code)
+                if  self.filter and not self.filter.isPass(tra, descriptor, code):
+                    return
+                self.eTotal += 1
                 if  descriptor in self.solvingTable and code in self.solvingTable[descriptor] and self.solvingTable[descriptor][code] == SOLVED:
                     pass
                 elif descriptor in self.solvingTable and code in self.solvingTable[descriptor] and self.solvingTable[descriptor][code] == DISCOVERED:
@@ -98,40 +106,3 @@ class TransactionManager(object):
             except InterfaceLoader.NoneExistCode as e:
                 logger.warn("missed transaction {}[{}]".format(descriptor, tra.code))
 
-    def dump(self):
-        for tra in self.transactions:
-            """
-            print "[{pid}]{pname}:{tname} {type}".format(pid = tra.from_proc, pname = tra.from_proc_name, tname = tra.from_thread_name, type = tra.type)
-            print tra.parcel
-            print "____"
-            """
-            if  tra.type == "BC_TRANSACTION":
-                if  int(tra.length) > 0:
-                    try:
-                        descriptor = tra.parcel.getDescriptor()
-                    except Parcel.IllegalParcel as e:
-                        logger.info(tra)
-                        logger.warn(e.args[0])
-                else:
-                    continue
-
-                if  descriptor in hardwareDescriptors:
-                    continue
-                try:
-                    code = self.iLoader.getCode(descriptor, tra.code)
-
-                    print self.sSolver.solve(descriptor, code, tra.parcel)
-                    """
-                    formater = {
-                            "pid": tra.from_proc,
-                            "pname": tra.from_proc_name,
-                            "tname": tra.from_thread_name,
-                            "type": tra.type,
-                            "code": code,
-                            }
-                    print "[{pid}]{pname}:{tname} {type}/{code}".format(**formater)
-                    print tra.parcel
-                    print "____"
-                    """
-                except InterfaceLoader.NoneExistCode as e:
-                    logger.warn("missed transaction {}[{}]".format(descriptor, tra.code))
