@@ -74,45 +74,57 @@ class TransactionManager(object):
     def registFilter(self, filter):
         self.filter = filter
 
+    def lookup(self, tra):
+        try:
+            descriptor = tra.parcel.getDescriptor()
+        except Parcel.IllegalParcel as e:
+            #logger.info(tra)
+            #logger.warn(e.args[0])
+            raise LookupException("lookup descriptor fail: {}".format(e.args[0]))
+
+        if  descriptor in hardwareDescriptors:
+            raise HardwareDescriptor()
+
+        try:
+            code = self.iLoader.getCode(descriptor, tra.code)
+        except InterfaceLoader.NoneExistCode as e:
+            self.missedTransaction[descriptor].add(tra.code)
+            raise LookupException("none exist code with {}:{}".format(descriptor, tra.code))
+        return descriptor, code
+
     def solve(self, tra):
         if  tra.type == "BC_TRANSACTION":
             try:
-                descriptor = tra.parcel.getDescriptor()
-            except Parcel.IllegalParcel as e:
-                logger.info(tra)
-                logger.warn(e.args[0])
+                descriptor, code = self.lookup(tra)
+            except LookupException as e:
+                logger.warn(e)
+                return 
+            except HardwareDescriptor:
                 return
 
-            if  descriptor in hardwareDescriptors:
+            if  self.filter and not self.filter.isPass(tra, descriptor, code):
                 return
-            try:
-                code = self.iLoader.getCode(descriptor, tra.code)
-                if  self.filter and not self.filter.isPass(tra, descriptor, code):
-                    return
-                self.eTotal += 1
-                if  descriptor in self.solvingTable and code in self.solvingTable[descriptor] and self.solvingTable[descriptor][code] == SOLVED:
-                    pass
-                elif descriptor in self.solvingTable and code in self.solvingTable[descriptor] and self.solvingTable[descriptor][code] == DISCOVERED:
-                    pass
-                else:
-                    self.total += 1
-                    self.solvingTable[descriptor][code] = DISCOVERED
-                print "=============================="
-                print "#{} {} ==> {} / [{}]: {}".format(tra.debug_id, tra.from_proc_name, tra.to_proc_name, descriptor, code)
-                print "{{{"
-                result = self.sSolver.solve(descriptor, code, tra.parcel)
-                if  result:
-                    self.eSolved += 1
-                    if  self.solvingTable[descriptor][code] != SOLVED:
-                        self.solved += 1
-                        self.solvingTable[descriptor][code] = SOLVED
-                    print "}}}"
-                    print "\t" + result
-                else:
-                    print "}}}"
-            except InterfaceLoader.NoneExistCode as e:
+            self.eTotal += 1
+            if  descriptor in self.solvingTable and code in self.solvingTable[descriptor] and self.solvingTable[descriptor][code] == SOLVED:
+                pass
+            elif descriptor in self.solvingTable and code in self.solvingTable[descriptor] and self.solvingTable[descriptor][code] == DISCOVERED:
+                pass
+            else:
+                self.total += 1
+                self.solvingTable[descriptor][code] = DISCOVERED
+            print "=============================="
+            print "#{} {} ==> {} / [{}]: {}".format(tra.debug_id, tra.from_proc_name, tra.to_proc_name, descriptor, code)
+            print "{{{"
+            result = self.sSolver.solve(descriptor, code, tra.parcel)
+            if  result:
+                self.eSolved += 1
+                if  self.solvingTable[descriptor][code] != SOLVED:
+                    self.solved += 1
+                    self.solvingTable[descriptor][code] = SOLVED
                 print "}}}"
-                self.missedTransaction[descriptor].add(tra.code)
+                print "\t" + result
+            else:
+                print "}}}"
         """
         else:
             print tra
@@ -123,4 +135,10 @@ class TransactionManager(object):
         for descriptor, codes in self.missedTransaction.items():
             result += "[{}]:{}\n".format(descriptor, ", ".join(str(i) for i in codes))
         return result
+
+class LookupException(Exception):
+    pass
+
+class HardwareDescriptor(Exception):
+    pass
 
