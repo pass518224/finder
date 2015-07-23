@@ -113,8 +113,10 @@ class TransactionManager(object):
             except InterfaceLoader.NoneExistCode as e:
                 print "}}}"
                 self.missedTransaction[descriptor].add(tra.code)
+        """
         else:
             print tra
+        """
 
     def getMissedTransaction(self):
         result = "\n"
