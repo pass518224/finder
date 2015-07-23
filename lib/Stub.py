@@ -1,6 +1,8 @@
 import logging
 import sys
-sys.path.append("/Users/lucas/finder/Creators")
+
+import tools.Config as Config
+sys.path.append(Config.Path.CREATOR)
 from android.os.StrictMode import StrictMode
 
 logger = logging.getLogger(__name__)

@@ -25,6 +25,7 @@ class PathInfo(Config):
     _STUB        = path.abspath(path.join( PROJECT, "_Stub" ))
     _NATIVE_STUB = path.abspath(path.join( PROJECT, "_NativeStub" ))
     OUT          = path.abspath(path.join( PROJECT, "out" ))
+    CREATOR      = path.abspath(path.join( PROJECT, "out/android-5.1.1_r1/java" ))
     EVAL         = path.abspath(path.join( OUT, "evaluation" ))
 
 class SystemInfo(Config):
