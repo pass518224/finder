@@ -322,7 +322,7 @@ class Compiler(object):
         body  = body.body
 
         self.p("if {case}:\n".format(case=" and ".join("mycase(\"" + i.value.split(".")[-1] + "\")" for i in cases)))
-        self.indent(" and ".join("mycase(" + i.value + ")" for i in cases))
+        self.indent(" or ".join("mycase(" + i.value + ")" for i in cases))
 
         for comp in body:
             self.solver(comp)
@@ -357,6 +357,7 @@ class Compiler(object):
         body=<class 'plyj.model.Block'>
         """
         self.solver(body.init)
+        self.p("i=0\n")
         self.p("while {}:\n".format(self.solver(body.predicate)))
         self.indent("For loop")
         self.solver(body.body)

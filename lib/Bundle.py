@@ -1,7 +1,11 @@
 import Parcel
+import sys
+
 class BaseBundle(object):
     """docstring for BaseBundle"""
     def __init__(self, parcel, length):
+        self.mParcelledData = None
+        self.mClassLoader = None
         self.readFromParcelInner(parcel, length)
 
     def readFromParcelInner(self, parcel, length):
@@ -28,6 +32,25 @@ class Bundle(BaseBundle):
 
         self.mHasFds = self.mParcelledData.hasFileDescriptors()
         self.mFdsKnown = True
+        self.mMap = {}
 
     def setClassLoader(self, loader):
         self.loader = loader
+
+    def unparcel(self):
+        if  self.mParcelledData == None:
+            return
+
+        N = self.mParcelledData.readInt()
+
+        if  N < 0:
+            return
+
+        self.mParcelledData.readArrayMapInternal(self.mMap, N, self.mClassLoader)
+
+    def __str__(self):
+        try:
+            self.unparcel()
+            return str(self.mMap)
+        except:
+            return str(self.mMap) + "... unsolved"

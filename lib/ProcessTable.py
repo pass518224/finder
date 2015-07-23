@@ -1,4 +1,5 @@
 import logging
+import re
 
 logger = logging.getLogger(__name__)
 
@@ -28,8 +29,10 @@ class ProcessTable(object):
         logger.debug("del thread:{0}".format(tid))
         if  tid in self.table:
             del self.table[tid]
+        """ appear but not in table
         else:
             logger.warn("delete unused thread:[{0}]".format(tid))
+        """
 
     def getNameFromPid(self, pid):
         if  type(pid) == int:
@@ -39,6 +42,18 @@ class ProcessTable(object):
             raise NoneExistPid
         
         return (self.table[pid]["name"], self.table[pid]["type"])
+
+    def readFromPs(self, ps):
+        rawline = ps.readline().strip("\n\r")
+        headlines = re.split(r' +', rawline)
+        pidOffset = headlines.index("PID")
+        nameOffset = headlines.index("NAME")
+
+        for line in ps.read().split("\r\n"):
+            data = re.split(r' +', line)
+            if  len(data) < nameOffset:
+                continue
+            self.newProcess(data[pidOffset], data[nameOffset+1])
 
     def dumpTable(self):
         for node in self.table:

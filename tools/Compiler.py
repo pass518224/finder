@@ -530,7 +530,7 @@ class Compiler(object):
         if  cases[0] == "default":
             self.p("if mycase():\n", offset=-1)
         else:
-            self.p("if {}:\n".format(" and ".join("mycase(" + i + ")" for i in cases)), offset=-1)
+            self.p("if {}:\n".format(" or ".join("mycase(" + i + ")" for i in cases)), offset=-1)
 
         if  len(body.body) == 0:
             self.p("pass\n")

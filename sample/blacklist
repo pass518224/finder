@@ -16,3 +16,7 @@ TRANSACTION_getWifiDisplayStatus
 
 [android.app.IActivityManager]
 CHECK_PERMISSION_TRANSACTION
+
+#drag luncher
+[android.view.IWindowSession]
+TRANSACTION_setWallpaperPosition

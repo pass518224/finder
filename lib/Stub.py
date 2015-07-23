@@ -16,8 +16,13 @@ class Stub(object):
         _arg0 = self.creatorResolver("android.media.AudioAttributes", data)
         """
         className = name.split(".")[-1]
-        creator = __import__(name, globals(), locals(), className)
-        result = getattr(creator, className).CREATOR.createFromParcel(*args)
+        try:
+            creator = __import__(name, globals(), locals(), className)
+            result = getattr(creator, className).CREATOR.createFromParcel(*args)
+        except ImportError:
+            name = ".".join(name.split(".")[:-1])
+            creator = __import__(name, globals(), locals(), className)
+            result = getattr(creator, className).CREATOR.createFromParcel(*args)
 
         return "creator of [{}]".format(creator)
 

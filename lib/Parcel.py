@@ -29,6 +29,36 @@ def hook(func):
         return _result
     return hookFunction
 
+VAL_NULL = -1;
+VAL_STRING = 0;
+VAL_INTEGER = 1;
+VAL_MAP = 2;
+VAL_BUNDLE = 3;
+VAL_PARCELABLE = 4;
+VAL_SHORT = 5;
+VAL_LONG = 6;
+VAL_FLOAT = 7;
+VAL_DOUBLE = 8;
+VAL_BOOLEAN = 9;
+VAL_CHARSEQUENCE = 10;
+VAL_LIST  = 11;
+VAL_SPARSEARRAY = 12;
+VAL_BYTEARRAY = 13;
+VAL_STRINGARRAY = 14;
+VAL_IBINDER = 15;
+VAL_PARCELABLEARRAY = 16;
+VAL_OBJECTARRAY = 17;
+VAL_INTARRAY = 18;
+VAL_LONGARRAY = 19;
+VAL_BYTE = 20;
+VAL_SERIALIZABLE = 21;
+VAL_SPARSEBOOLEANARRAY = 22;
+VAL_BOOLEANARRAY = 23;
+VAL_CHARSEQUENCEARRAY = 24;
+VAL_PERSISTABLEBUNDLE = 25;
+VAL_SIZE = 26;
+VAL_SIZEF = 27;
+
 class Parcel(object):
     """Parcel object to contain data"""
     def __init__(self, raw):
@@ -115,6 +145,55 @@ class Parcel(object):
         if  loader != None:
             bundle.setClassLoader(loader)
         return bundle
+
+    def readArrayMapInternal(self, map, N, loader):
+        while N > 0:
+            key = self.readString()
+            val = self.readValue(loader)
+            map[key] = val
+            N -= 1
+
+    def readValue(self, loader):
+        type = self.readInt()
+        
+        if  type==VAL_NULL:
+            return None
+        elif type == VAL_STRING:
+            return self.readString()
+        elif type == VAL_INTEGER:
+            return self.readInt()
+        elif type == VAL_MAP:
+            return self.readHashMap(loader)
+        elif type == VAL_PARCELABLE:
+            return self.readParcelable(loader)
+        elif type == VAL_SHORT:
+            return self.readInt()
+        elif type == VAL_LONG:
+            return self.readLong()
+        elif type == VAL_FLOAT:
+            return self.readFloat()
+        elif type == VAL_DOUBLE:
+            return self.readDouble()
+        elif type == VAL_BOOLEAN:
+            return self.readint() == 1
+        elif type == VAL_LIST:
+            return self.readArrayList(loader)
+        elif type == VAL_BOOLEANARRAY:
+            return self.createBooleanArray()
+        elif type == VAL_BYTEARRAY:
+            return self.createByteArray()
+        elif type == VAL_STRINGARRAY:
+            return self.readStringArray()
+        elif type == VAL_IBINDER:
+            return self.readStrongBinder()
+        elif type == VAL_OBJECTARRAY:
+            return self.readArray()
+        elif type == VAL_INTARRAY:
+            return self.createIntArray()
+        elif type == VAL_LONGARRAY:
+            return self.createLongArray()
+        elif type == VAL_BYTE:
+            return self.readByte()
         
     @hook
     def readString(self):

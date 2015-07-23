@@ -23,7 +23,8 @@ hardwareDescriptors = [
     "android.media.IAudioTrack",
     "android.utils.IMemory",
     "android.hardware.ISoundTriggerHwService",
-    "drm.IDrmManagerService"
+    "drm.IDrmManagerService",
+    "android.media.IMediaMetadataRetriever"
 ]
 
 DISCOVERED = "DISCOVERED"
@@ -49,6 +50,8 @@ class TransactionManager(object):
         self.eSolved = 0
 
         self.filter = None
+
+        self.missedTransaction = defaultdict(set)
 
     def addTransaction(self, transaction):
         try:
@@ -96,13 +99,26 @@ class TransactionManager(object):
                     self.solvingTable[descriptor][code] = DISCOVERED
                 print "=============================="
                 print "#{} {} ==> {} / [{}]: {}".format(tra.debug_id, tra.from_proc_name, tra.to_proc_name, descriptor, code)
+                print "{{{"
                 result = self.sSolver.solve(descriptor, code, tra.parcel)
                 if  result:
                     self.eSolved += 1
                     if  self.solvingTable[descriptor][code] != SOLVED:
                         self.solved += 1
                         self.solvingTable[descriptor][code] = SOLVED
+                    print "}}}"
                     print "\t" + result
+                else:
+                    print "}}}"
             except InterfaceLoader.NoneExistCode as e:
-                logger.warn("missed transaction {}[{}]".format(descriptor, tra.code))
+                print "}}}"
+                self.missedTransaction[descriptor].add(tra.code)
+        else:
+            print tra
+
+    def getMissedTransaction(self):
+        result = "\n"
+        for descriptor, codes in self.missedTransaction.items():
+            result += "[{}]:{}\n".format(descriptor, ", ".join(str(i) for i in codes))
+        return result
 

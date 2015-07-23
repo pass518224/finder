@@ -13,6 +13,9 @@ class FilterAdaptor(object):
         if  args.black_list:
             self.blacklist(args.black_list)
 
+        if  args.negation:
+            self.factory.negate()
+
         if  args.contain or args.sender or args.receiver:
             self.nameFilter(args)
         

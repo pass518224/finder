@@ -20,16 +20,27 @@ These data structures are also useful for forensic and static analysis.
 Usage
 ----
 
-> usage: finder.py [-h] [-d] [input]
+> usage: finder.py [-h] [-d] [-s SENDER] [-r RECEIVER] [-c CONTAIN]
+>                  [--black-list FILE_PATH] [--info]
+>                  [input]
 > 
 > finder - Android ICC parser
 > 
 > positional arguments:
->   input        ICC log file.
+>   input                 ICC log file.
 > 
 > optional arguments:
->   -h, --help   show this help message and exit
->   -d, --debug  enable debug trace
+>   -h, --help            show this help message and exit
+>   -d, --debug           enable debug trace
+>   -s SENDER, --sender SENDER
+>                         only show filter from the pattern
+>   -r RECEIVER, --receiver RECEIVER
+>                         only show filter to the pattern
+>   -c CONTAIN, --contain CONTAIN
+>                         only show filter contained the pattern
+>   --black-list FILEPATH
+>                         Block the ICC transaction in blacklist
+>   --info                show log info
 
 Finder need android repo which compiled from android java source code for solving transaction data.
 
@@ -241,5 +252,6 @@ it can't pass its test cases.
 Dependencies
 ----
 
++ [ply 3.4](https://github.com/dabeaz/ply)
 + [plyj](https://github.com/musiKk/plyj)
 + [simplejson](https://pypi.python.org/pypi/simplejson/)

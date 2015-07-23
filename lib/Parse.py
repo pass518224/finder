@@ -1,4 +1,5 @@
 import logging
+import re
 from collections import Iterator
 
 logger = logging.getLogger(__name__)
@@ -46,8 +47,9 @@ class Parser(Iterator):
 
             #parse the format
             if  raw[0] is "[":  # system related infomation
-                if  raw.find("Error dump: sys") > 0:
-                    raw = raw.replace("Error dump: sys", "Error_dump_sys")
+                if  raw.find("Error dump:") > 0:
+                    offset = raw.find("Error dump:")
+                    raw = raw[:offset] + "Error_dump_sys]"
 
                 flag = INFO
                 info = infoCreator(raw)
@@ -74,8 +76,6 @@ class Parser(Iterator):
                 info = infoCreator(raw)
                 if  "length" in info and info["length"] == "0":
                     continue
-                if len(info) < 1:
-                    print "asfasdfjaklsfjakljfakldklajkl"
                 info["type"] = type
 
                 self.info = info

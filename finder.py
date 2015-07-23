@@ -17,12 +17,14 @@ from lib.FilterAdaptor import FilterAdaptor
 
 import tools.Config as Config
 
-def finder(fd, filter = None):
+def finder(fd, filter=None, ps=None):
     """entry function"""
     sys_log = Parse.Parser(fd)
 
     #process related
     pTable = PTable.ProcessTable()
+    if  ps:
+        pTable.readFromPs(ps)
     pAdaptor = PAdaptor.ProcessAdaptor(pTable)
 
     #loaders
@@ -51,6 +53,8 @@ def finder(fd, filter = None):
             except Transaction.TransactionError as e:
                 logger.warn("transaction error: " + e.args[0])
 
+    logger.info(tManager.getMissedTransaction())
+
     out = os.path.abspath(os.path.join(Config.Path.OUT, Config.System.VERSION, "Report"))
     with open(out, "w") as outFd:
         outFd.write("{}\n".format(json.dumps(tManager.solvingTable, indent=4, sort_keys=True)))
@@ -70,10 +74,16 @@ def parseArgument():
     group.add_argument("-s", "--sender", help="only show filter from the pattern")
     group.add_argument("-r", "--receiver", help="only show filter to the pattern")
     group.add_argument("-c", "--contain", help="only show filter contained the pattern")
-    parser.add_argument("--black-list", type=file, metavar="FILE_PATH", help="Block the ICC transaction in blacklist")
+
+    parser.add_argument("-n", "--negation", action="store_true", help="negate the result of filter", default=False)
+    parser.add_argument("--black-list", type=file, metavar="FILEPATH", help="Block the ICC transaction in blacklist")
 
     #show log info
     parser.add_argument("--info", action="store_true", help="show log info", default=False)
+
+    #ps file to complete process name
+    parser.add_argument("--ps", type=file, help="ps cmd result")
+
     args = parser.parse_args()
 
     Config.DEBUG = args.debug
@@ -87,4 +97,4 @@ if __name__ == '__main__':
     args = parseArgument()
     filter = FilterAdaptor(args).getFilter()
     
-    finder(args.input, filter=filter)
+    finder(args.input, filter=filter, ps=args.ps)
