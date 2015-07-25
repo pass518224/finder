@@ -44,7 +44,9 @@ class Stub(object):
         raise CallCreator("new instance with name: {}({})".format(name, [str(type(i)) for i in args]))
 
     def callFunction(self, funName, *args, **kargs):
-        return "{}({})".format(funName, ", ".join(str(i) for i in args))
+        result = list(args)
+        result.insert(0, funName)
+        return result
        
 class CallCreator(Exception):
     pass

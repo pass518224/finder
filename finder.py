@@ -13,6 +13,7 @@ import lib.Transaction as Transaction
 
 import lib.InterfaceLoader as ILoader
 import lib.StructureSolver as StructureSolver
+import lib.Module as Module
 from lib.FilterAdaptor import FilterAdaptor
 
 import tools.Config as Config
@@ -37,6 +38,9 @@ def finder(fd, filter=None, ps=None):
     if  filter:
         tManager.registFilter(filter)
 
+    #finder start hook point
+    Module.getModule().call("FINDER_START")
+
     for flag in sys_log:
         if flag == Parse.INFO:
             # handle system INFO
@@ -52,17 +56,11 @@ def finder(fd, filter=None, ps=None):
                 tManager.solve(tra)
             except Transaction.TransactionError as e:
                 logger.warn("transaction error: " + e.args[0])
-
+    #tManager.list()
     logger.info(tManager.getMissedTransaction())
 
-    out = os.path.abspath(os.path.join(Config.Path.OUT, Config.System.VERSION, "Report"))
-    with open(out, "w") as outFd:
-        outFd.write("{}\n".format(json.dumps(tManager.solvingTable, indent=4, sort_keys=True)))
-        outFd.write("\n{}\n=========================\n".format("Solving Rate"))
-        outFd.write(" Total: {}\n Solved: {}\n Solving Rate: {}\n".format(tManager.eTotal, tManager.eSolved, float(tManager.eSolved)/float(tManager.eTotal) * 100))
-        outFd.write("\n{}\n=========================\n".format("coverage"))
-        outFd.write(" Total: {}\n Solved: {}\n Solving Rate: {}\n".format(tManager.total, tManager.solved, float(tManager.solved)/float(tManager.total) * 100))
-    #pTable.dumpTable()
+    #finder end hook point
+    Module.getModule().call("FINDER_END")
 
 def parseArgument():
     parser = argparse.ArgumentParser(description="finder - Android ICC parser")
@@ -81,12 +79,15 @@ def parseArgument():
     #show log info
     parser.add_argument("--info", action="store_true", help="show log info", default=False)
 
+    parser.add_argument("--not-solve", action="store_true", help="not to solve ICC data", default=False)
+
     #ps file to complete process name
     parser.add_argument("--ps", type=file, help="ps cmd result")
 
     args = parser.parse_args()
 
     Config.DEBUG = args.debug
+    Config.NOT_SOLVE = args.not_solve
     return args
 
 if __name__ == '__main__':
@@ -96,5 +97,7 @@ if __name__ == '__main__':
 
     args = parseArgument()
     filter = FilterAdaptor(args).getFilter()
+    
+    Module.getModule().add("Statistic")
     
     finder(args.input, filter=filter, ps=args.ps)

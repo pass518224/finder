@@ -86,6 +86,7 @@ else:
         
 
 DEBUG = False
+NOT_SOLVE = False
 
 if __name__ == '__main__':
     Path.dump()

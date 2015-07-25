@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 """
 Compare interface files between android version
 """

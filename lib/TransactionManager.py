@@ -4,6 +4,9 @@ from collections import defaultdict
 import ProcessTable
 import Parcel
 import InterfaceLoader
+import Module
+
+import tools.Config as Config
 
 logger = logging.getLogger(__name__)
 
@@ -43,11 +46,6 @@ class TransactionManager(object):
         if  structureSolver is not None:
             self.sSolver = structureSolver
 
-        self.solvingTable = defaultdict(dict)
-        self.total = 0
-        self.solved = 0
-        self.eTotal = 0
-        self.eSolved = 0
 
         self.filter = None
 
@@ -92,6 +90,18 @@ class TransactionManager(object):
             raise LookupException("none exist code with {}:{}".format(descriptor, tra.code))
         return descriptor, code
 
+    def list(self):
+        for tra in self.transactions:
+            if  tra.type == "BC_TRANSACTION":
+                try:
+                    descriptor, code = self.lookup(tra)
+                except:
+                    continue
+                if  self.filter and not self.filter.isPass(tra, descriptor, code):
+                    continue
+                print ",".join(str(i) for i in [tra.time, tra.debug_id, tra.from_proc_name, tra.to_proc_name, descriptor, code])
+        
+
     def solve(self, tra):
         if  tra.type == "BC_TRANSACTION":
             try:
@@ -104,27 +114,22 @@ class TransactionManager(object):
 
             if  self.filter and not self.filter.isPass(tra, descriptor, code):
                 return
-            self.eTotal += 1
-            if  descriptor in self.solvingTable and code in self.solvingTable[descriptor] and self.solvingTable[descriptor][code] == SOLVED:
-                pass
-            elif descriptor in self.solvingTable and code in self.solvingTable[descriptor] and self.solvingTable[descriptor][code] == DISCOVERED:
-                pass
-            else:
-                self.total += 1
-                self.solvingTable[descriptor][code] = DISCOVERED
-            print "=============================="
-            print "#{} {} ==> {} / [{}]: {}".format(tra.debug_id, tra.from_proc_name, tra.to_proc_name, descriptor, code)
-            print "{{{"
-            result = self.sSolver.solve(descriptor, code, tra.parcel)
-            if  result:
-                self.eSolved += 1
-                if  self.solvingTable[descriptor][code] != SOLVED:
-                    self.solved += 1
-                    self.solvingTable[descriptor][code] = SOLVED
+
+            Module.getModule().call("SOLVING_START", tra, descriptor, code)
+
+
+            if  not Config.NOT_SOLVE:
+                print "=============================="
+                print "#{} {} ==> {} / [{}]: {}".format(tra.debug_id, tra.from_proc_name, tra.to_proc_name, descriptor, code)
+                print "{{{"
+                result = self.sSolver.solve(descriptor, code, tra.parcel)
                 print "}}}"
-                print "\t" + result
-            else:
-                print "}}}"
+
+                if  result:
+                    print "\t{}({})".format(result[0], ", ".join(str(i) for i in result[1:]))
+                    Module.getModule().call("SOLVING_SUCCESS", *result)
+                else:
+                    Module.getModule().call("SOLVING_FAIL")
         """
         else:
             print tra
