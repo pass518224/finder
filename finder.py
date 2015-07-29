@@ -58,6 +58,7 @@ def finder(fd, filter=None, ps=None):
                 logger.warn("transaction error: " + e.args[0])
     #tManager.list()
     logger.info(tManager.getMissedTransaction())
+    print pTable.dumpTable()
 
     #finder end hook point
     Module.getModule().call("FINDER_END")
@@ -82,7 +83,7 @@ def parseArgument():
     parser.add_argument("--not-solve", action="store_true", help="not to solve ICC data", default=False)
 
     #ps file to complete process name
-    parser.add_argument("--ps", type=file, help="ps cmd result")
+    parser.add_argument("--ps", metavar="CHROME.PS", type=file, help="ps cmd result")
 
     args = parser.parse_args()
 
@@ -99,5 +100,6 @@ if __name__ == '__main__':
     filter = FilterAdaptor(args).getFilter()
     
     Module.getModule().add("Statistic")
+    Module.getModule().add("TimeSlicer")
     
     finder(args.input, filter=filter, ps=args.ps)

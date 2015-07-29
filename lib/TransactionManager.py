@@ -1,4 +1,5 @@
 import logging
+from datetime import datetime
 from collections import defaultdict
 
 import ProcessTable
@@ -11,7 +12,7 @@ import tools.Config as Config
 logger = logging.getLogger(__name__)
 
 hardwareDescriptors = [
-    "android.net.INetworkStatsService",
+    #"android.net.INetworkStatsService",
     "android.gui.IGraphicBufferProducer",
     "android.gui.DisplayEventConnection",
     "android.ui.ISurfaceComposer",
@@ -107,7 +108,7 @@ class TransactionManager(object):
             try:
                 descriptor, code = self.lookup(tra)
             except LookupException as e:
-                logger.warn(e)
+                #logger.warn(e)
                 return 
             except HardwareDescriptor:
                 return
@@ -120,10 +121,11 @@ class TransactionManager(object):
 
             if  not Config.NOT_SOLVE:
                 print "=============================="
+                #print "#{}[{}] {} ==> {} / [{}]: {}".format(tra.debug_id, datetime.fromtimestamp(tra.time).strftime('%Y-%m-%d %H:%M:%S'), tra.from_proc_name, tra.to_proc_name, descriptor, code)
                 print "#{} {} ==> {} / [{}]: {}".format(tra.debug_id, tra.from_proc_name, tra.to_proc_name, descriptor, code)
-                print "{{{"
+                #print "{{{"
                 result = self.sSolver.solve(descriptor, code, tra.parcel)
-                print "}}}"
+                #print "}}}"
 
                 if  result:
                     print "\t{}({})".format(result[0], ", ".join(str(i) for i in result[1:]))

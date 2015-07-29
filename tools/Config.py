@@ -22,10 +22,12 @@ class PathInfo(Config):
     TOOLS        = path.dirname(path.abspath(__file__))
     PROJECT      = path.abspath(path.join( TOOLS , ".." ))
     _IINTERFACE  = path.abspath(path.join( PROJECT, "_IInterface" ))
+    _HARDWARE    = path.abspath(path.join( PROJECT, "_Hardware" ))
     _STUB        = path.abspath(path.join( PROJECT, "_Stub" ))
     _NATIVE_STUB = path.abspath(path.join( PROJECT, "_NativeStub" ))
     OUT          = path.abspath(path.join( PROJECT, "out" ))
     CREATOR      = path.abspath(path.join( PROJECT, "out/android-5.1.1_r1/java" ))
+    MODULE       = path.abspath(path.join( PROJECT, "modules" ))
     EVAL         = path.abspath(path.join( OUT, "evaluation" ))
 
 class SystemInfo(Config):
@@ -36,6 +38,8 @@ class SystemInfo(Config):
 
     def configure(self):
         self.FRAMEWORK      = path.abspath(path.join(self.WORKINGDIR, "frameworks"))
+        self.SYSTEM         = path.abspath(path.join(self.WORKINGDIR, "system"))
+        self.PACKAGES       = path.abspath(path.join(self.WORKINGDIR, "packages"))
         self.LIBCORE        = path.abspath(path.join(self.WORKINGDIR, "libcore/luni/src/main/java/libcore/"))
         self.LIBJAVA        = path.abspath(path.join(self.WORKINGDIR, "libcore/luni/src/main/java/java/"))
         self.JAVA_POOL      = path.abspath(path.join(self.WORKINGDIR, "frameworks/base/core/java/"))

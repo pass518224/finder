@@ -18,6 +18,9 @@ class Module(object):
         logger.info("module [{}] loading".format(name))
         if hasattr(module, "module_init") :
             descriptor = module.module_init()
+            if  type(descriptor) != dict:
+                logger.warn("return of module_init must be a dict of function pointer, {} given.".format(type(descriptor)))
+                exit()
             for hook, func in descriptor.items():
                 try:
                     self.funcs[hook].append(func)

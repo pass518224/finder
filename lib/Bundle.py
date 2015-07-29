@@ -53,4 +53,4 @@ class Bundle(BaseBundle):
             self.unparcel()
             return str(self.mMap)
         except:
-            return str(self.mMap) + "... unsolved"
+            return str(self.mMap) + "... unsolved: " + sys.exec_info()
