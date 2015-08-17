@@ -3,7 +3,11 @@ import logging
 logger = logging.getLogger(__name__)
 
 class Module(object):
-    """docstring for Mo"""
+    """Module loader
+        Get modules name and place hook functions at the corresponding place.
+
+        The path of modules is at "finder/modules/"
+    """
     def __init__(self):
         self.funcs = {
             "FINDER_START" : [],
@@ -15,7 +19,7 @@ class Module(object):
 
     def add(self, name):
         module = __import__("modules." + name, globals(), locals(), name)
-        logger.info("module [{}] loading".format(name))
+        logger.info("Load module === {} ===".format(name))
         if hasattr(module, "module_init") :
             descriptor = module.module_init()
             if  type(descriptor) != dict:

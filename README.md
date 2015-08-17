@@ -1,6 +1,9 @@
 Finder
 ====
 
+Introduction
+----
+
 A parser generator for recovering the ICC (inter-component communication) data. 
 The ICC data are gathered through hooking Android binder driver .
 
@@ -20,8 +23,9 @@ These data structures are also useful for forensic and static analysis.
 Usage
 ----
 
-> usage: finder.py [-h] [-d] [-s SENDER] [-r RECEIVER] [-c CONTAIN]
->                  [--black-list FILE_PATH] [--info]
+> usage: finder.py [-h] [-d] [-s SENDER | -r RECEIVER | -c CONTAIN] [-n]
+>                  [--black-list FILEPATH] [--info] [--not-solve]
+>                  [--ps CHROME.PS]
 >                  [input]
 > 
 > finder - Android ICC parser
@@ -38,15 +42,19 @@ Usage
 >                         only show filter to the pattern
 >   -c CONTAIN, --contain CONTAIN
 >                         only show filter contained the pattern
+>   -n, --negation        negate the result of filter
 >   --black-list FILEPATH
 >                         Block the ICC transaction in blacklist
 >   --info                show log info
+>   --not-solve           not to solve ICC data
+>   --ps CHROME.PS        ps cmd result
 
-Finder need android repo which compiled from android java source code for solving transaction data.
+
+Finder need `android repo` which compiled from android java source code to help for solving transaction data.
 
 Download the repo for your coresponding version of Android
 
-> I put the repo at the directly `repo`
+> I put the transpiled repo at the directly `repo`
 
 create the destination directory to put repo
 
@@ -57,6 +65,13 @@ create the destination directory to put repo
     cd ..
 
 Now your Finder is support version 5.1.1!
+
+Module System
+----
+
+Finder export some hook points for inspecting while solving the log.
+
+The detail of module system can see [modules/README.md](../modules/README.md)
 
 Tools
 ----

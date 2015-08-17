@@ -19,7 +19,7 @@ from lib.FilterAdaptor import FilterAdaptor
 import tools.Config as Config
 
 def finder(fd, filter=None, ps=None):
-    """entry function"""
+    """finder entry function"""
     sys_log = Parse.Parser(fd)
 
     #process related
@@ -58,7 +58,6 @@ def finder(fd, filter=None, ps=None):
                 logger.warn("transaction error: " + e.args[0])
     #tManager.list()
     logger.info(tManager.getMissedTransaction())
-    print pTable.dumpTable()
 
     #finder end hook point
     Module.getModule().call("FINDER_END")
@@ -92,8 +91,7 @@ def parseArgument():
     return args
 
 if __name__ == '__main__':
-    #logging.basicConfig(level = logging.DEBUG)
-    logging.basicConfig(level = logging.CRITICAL)
+    logging.basicConfig(level = logging.INFO)
     logger = logging.getLogger(__name__)
 
     args = parseArgument()
