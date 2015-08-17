@@ -68,7 +68,7 @@ class TransactionManager(object):
             setattr(transaction, "to_proc_name", fName)
         except ProcessTable.NoneExistPid:
             setattr(transaction, "to_proc_name", UNKNOWN_NAME)
-        self.transactions.append(transaction)
+        #self.transactions.append(transaction)
         
     def registFilter(self, filter):
         self.filter = filter

@@ -93,7 +93,7 @@ def parseArgument():
 
 if __name__ == '__main__':
     #logging.basicConfig(level = logging.DEBUG)
-    logging.basicConfig(level = logging.INFO)
+    logging.basicConfig(level = logging.CRITICAL)
     logger = logging.getLogger(__name__)
 
     args = parseArgument()
