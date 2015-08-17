@@ -71,7 +71,7 @@ Module System
 
 Finder export some hook points for inspecting while solving the log.
 
-The detail of module system can see [modules/README.md](../modules/README.md)
+The detail of module system can see [modules/README.md](./modules/README.md)
 
 Tools
 ----
