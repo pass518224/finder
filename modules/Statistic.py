@@ -1,3 +1,10 @@
+"""
+Statistic.py
+
+The module is used to count the solving rate of Finder.
+At the `end()` function will write the result to the file
+
+"""
 import logging
 import sys
 import os

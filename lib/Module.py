@@ -5,8 +5,10 @@ logger = logging.getLogger(__name__)
 class Module(object):
     """Module loader
         Get modules name and place hook functions at the corresponding place.
+        The modules can hook at default hook point.
+        while the solving, the hook point triggered with corresponding arugments.
 
-        The path of modules is at "finder/modules/"
+        The path of modules is at "FINDER/modules/"
     """
     def __init__(self):
         self.funcs = {
@@ -16,8 +18,14 @@ class Module(object):
             "SOLVING_FAIL" : [],
             "FINDER_END" : []
         }
+        self.modules = set()
 
     def add(self, name):
+        """
+            Add modules to module system.
+        """
+        if  name in self.modules:
+            return
         module = __import__("modules." + name, globals(), locals(), name)
         logger.info("Load module === {} ===".format(name))
         if hasattr(module, "module_init") :
@@ -33,6 +41,7 @@ class Module(object):
                     exit()
         else:
             logging.warn("non found 'module_init' function of module:[{}]".format(name))
+        self.modules.add(name)
 
     def call(self, hookName, *args):
         if  self.funcs[hookName]:
@@ -41,6 +50,11 @@ class Module(object):
 
 instance = None
 def getModule():
+    """
+        return instance of module system.
+
+        All actions of modules should through this function.
+    """
     global instance
     if  not instance:
         instance = Module()

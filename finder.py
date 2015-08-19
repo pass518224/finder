@@ -24,7 +24,7 @@ def finder(fd, filter=None, ps=None):
 
     #process related
     pTable = PTable.ProcessTable()
-    if  ps:
+    if  ps: # complete the process name if has ps file
         pTable.readFromPs(ps)
     pAdaptor = PAdaptor.ProcessAdaptor(pTable)
 
@@ -41,6 +41,7 @@ def finder(fd, filter=None, ps=None):
     #finder start hook point
     Module.getModule().call("FINDER_START")
 
+    #start to parse log
     for flag in sys_log:
         if flag == Parse.INFO:
             # handle system INFO
@@ -56,13 +57,17 @@ def finder(fd, filter=None, ps=None):
                 tManager.solve(tra)
             except Transaction.TransactionError as e:
                 logger.warn("transaction error: " + e.args[0])
-    #tManager.list()
+    
+    # dump unfound descriptor with code
     logger.info(tManager.getMissedTransaction())
 
     #finder end hook point
     Module.getModule().call("FINDER_END")
 
 def parseArgument():
+    """
+        command line argument setting
+    """
     parser = argparse.ArgumentParser(description="finder - Android ICC parser")
     parser.add_argument("input", type=file, nargs="?", help="ICC log file.", default=sys.stdin)
     parser.add_argument("-d", "--debug", action="store_true", help="enable debug trace", default=False)
@@ -86,7 +91,10 @@ def parseArgument():
 
     args = parser.parse_args()
 
+    #setup debug flag
     Config.DEBUG = args.debug
+
+    #setup not solve flag
     Config.NOT_SOLVE = args.not_solve
     return args
 
@@ -97,6 +105,7 @@ if __name__ == '__main__':
     args = parseArgument()
     filter = FilterAdaptor(args).getFilter()
     
+    #loaded modules
     Module.getModule().add("Statistic")
     Module.getModule().add("TimeSlicer")
     

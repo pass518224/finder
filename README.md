@@ -23,38 +23,38 @@ These data structures are also useful for forensic and static analysis.
 Usage
 ----
 
-> usage: finder.py [-h] [-d] [-s SENDER | -r RECEIVER | -c CONTAIN] [-n]
->                  [--black-list FILEPATH] [--info] [--not-solve]
->                  [--ps CHROME.PS]
->                  [input]
-> 
-> finder - Android ICC parser
-> 
-> positional arguments:
->   input                 ICC log file.
-> 
-> optional arguments:
->   -h, --help            show this help message and exit
->   -d, --debug           enable debug trace
->   -s SENDER, --sender SENDER
->                         only show filter from the pattern
->   -r RECEIVER, --receiver RECEIVER
->                         only show filter to the pattern
->   -c CONTAIN, --contain CONTAIN
->                         only show filter contained the pattern
->   -n, --negation        negate the result of filter
->   --black-list FILEPATH
->                         Block the ICC transaction in blacklist
->   --info                show log info
->   --not-solve           not to solve ICC data
->   --ps CHROME.PS        ps cmd result
+    usage: finder.py [-h] [-d] [-s SENDER | -r RECEIVER | -c CONTAIN] [-n]
+                     [--black-list FILEPATH] [--info] [--not-solve]
+                     [--ps CHROME.PS]
+                     [input]
+    
+    finder - Android ICC parser
+    
+    positional arguments:
+      input                 ICC log file.
+    
+    optional arguments:
+      -h, --help            show this help message and exit
+      -d, --debug           enable debug trace
+      -s SENDER, --sender SENDER
+                            only show filter from the pattern
+      -r RECEIVER, --receiver RECEIVER
+                            only show filter to the pattern
+      -c CONTAIN, --contain CONTAIN
+                            only show filter contained the pattern
+      -n, --negation        negate the result of filter
+      --black-list FILEPATH
+                            Block the ICC transaction in blacklist
+      --info                show log info
+      --not-solve           not to solve ICC data
+      --ps CHROME.PS        ps cmd result
 
 
 Finder need `android repo` which compiled from android java source code to help for solving transaction data.
 
 Download the repo for your coresponding version of Android
 
-> I put the transpiled repo at the directly `repo`
+> I put the transpiled repo at the directly `repo/android-[VERSION].tar.gz`
 
 create the destination directory to put repo
 
@@ -76,7 +76,7 @@ The detail of module system can see [modules/README.md](./modules/README.md)
 Tools
 ----
 
-#### `tools/Config.py`
+#### `config`
 Config the path of this project and Android framework for interfaces collection.
 
     class Path(Config):

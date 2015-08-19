@@ -1,3 +1,14 @@
+"""
+TimeSlicer.py
+
+This module statistic the total amount of type of ICC with time quantum.
+The config of this module is at `TimeSlicer.ini`.
+
+The `config` field is the main config of this module, such as time quantum.
+
+The other name except of config is taken as class of types.
+The following name are the corresponding rescriptor and code name.
+"""
 import logging
 import ConfigParser
 import datetime

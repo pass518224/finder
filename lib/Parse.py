@@ -13,7 +13,10 @@ BC_REPLY = "BC_REPLY"
 
 
 class Parser(Iterator):
-    """a parser for switch input type"""
+    """Parser for logger data
+        Iterate the parser, the parser return flag of fetched data type.
+        The parsed data can be got by `getInfo()`.
+    """
     def __init__(self, fd):
         self.fd = fd
 
@@ -93,7 +96,7 @@ class Parser(Iterator):
         return self.raw
 
     def getInfo(self):
-        """get Parsed object"""
+        """return parsed data with dict type data structure"""
         return self.info
     
     def getDebug(self):
