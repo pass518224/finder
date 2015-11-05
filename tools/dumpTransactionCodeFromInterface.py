@@ -50,7 +50,7 @@ def parseTransactionCode(inputFd):
 if __name__ == '__main__':
     logger.setLevel(logging.DEBUG)
 
-    inputDir  = Config.Path._IINTERFACE
+    inputDir  = os.path.join(Config.Path._IINTERFACE, Config.System.VERSION)
     outputDir = os.path.join(Config.Path.OUT, Config.System.VERSION, "interface")
     filePaths = os.listdir(inputDir)
 
@@ -62,8 +62,7 @@ if __name__ == '__main__':
         with open(os.path.join(inputDir, filePath), "r") as inputFd:
             result = parseTransactionCode(inputFd)
             result["filename"] = filePath
-            
+
         with open(os.path.join(outputDir, result["descriptor"]), "w") as outputFd:
             outputFd.write(json.JSONEncoder(sort_keys = True, indent = 4).encode(result))
-
 

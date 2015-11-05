@@ -33,7 +33,7 @@ def recursiveCopy(source, target, excludePattern, includePattern):
     for file in fileWalker(source, excludePattern, includePattern):
         with open(file, "r") as fd:
             buf = fd.read()
-            if  buf.find("extends IInterface") > 0 or buf.find("extends android.os.IInterface") > 0:
+            if re.search("extends (android.os.)?IInterface[^>]",buf) and (buf.find("descriptor") > 0 or buf.find("Stub") > 0):
                 t_file = file.split("/")[-1]
                 shutil.copyfile(file, os.path.join(target, t_file))
                 logger.info(" o {}".format(file))

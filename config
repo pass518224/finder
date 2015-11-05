@@ -1,2 +1,3 @@
-ANDROID_SDK_SRC=/Volumes/android/sdk-source-5.1.1_r1
+#ANDROID_SDK_SRC=/home/dsns/dsns/sdk-source_5.1.1_r1
+ANDROID_SDK_SRC=/home/chchao/aosp/android-6.0.0_r1
 #VERSION=android-5.1.1_r1
