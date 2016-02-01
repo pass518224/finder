@@ -1,4 +1,6 @@
+
 import logging
+import pydoc
 import binascii
 import string
 import struct
@@ -11,6 +13,7 @@ from PersistableBundle import PersistableBundle
 from Bundle import Bundle
 
 import tools.Config as Config
+import __builtin__
 
 logger = logging.getLogger(__name__)
 BYTE = 4
@@ -25,6 +28,7 @@ def hook(func):
         code = calframe[1][4][0].replace(' ', "").replace("\n", "")
         print "module: {}:{}".format(calframe[1][1], calframe[1][2])
         _result = func(self, *args, **kargs)
+        self.test = '123213'
         print "\t{}    #{}".format(code, _result)
         return _result
     return hookFunction
@@ -71,6 +75,7 @@ class Parcel(object):
     @hook
     def enforceInterface(self, descriptor):
         policy = self.readInt()
+        __builtin__.json_output[ __builtin__.debugid ]['Extras'].append( { "Type":"Int", "Value":policy } )
         return self.readString()
 
     @hook
@@ -98,21 +103,31 @@ class Parcel(object):
 
     @hook
     def readByte(self):
-        return self.readInt() & 0xff
+        tmp = self.readInt()
+        __builtin__.json_output[ __builtin__.debugid ]['Extras'].append( { "Type":"Byte", "Value":tmp&0xff } )
+        return tmp & 0xff
 
     @hook
     def readLong(self):
-        return self.readInt64()
-
+        tmp = self.readInt64()
+        __builtin__.json_output[ __builtin__.debugid ]['Extras'].append( { "Type":"Long", "Value":tmp } )
+        return tmp
     @hook
     def readInt(self):
-        return self.readInt32()
+        tmp = self.readInt32()
+        __builtin__.json_output[ __builtin__.debugid ]['Extras'].append( { "Type":"Int32", "Value":tmp } )
+        return tmp
 
     def readInt32(self):
         offset = self.offset
         self.offset += 4
+        
+        print( help(__builtin__) )
+        
         try:
-            return struct.unpack("<i", self.data[offset: self.offset])[0]
+
+            tmp =  struct.unpack("<i", self.data[offset: self.offset])[0]
+            return tmp
         except struct.error as e:
             return 0
             raise IllegalParcel(e.args[0], "data[0x{:x}:0x{:x}] : {}".format(offset, self.offset, self.data[offset:self.offset].encode("hex")))
@@ -121,7 +136,9 @@ class Parcel(object):
         offset = self.offset
         self.offset += 8
         try:
-            return struct.unpack("<i", self.data[offset: self.offset])[0]
+            tmp = struct.unpack("<i", self.data[offset: self.offset])[0]
+            __builtin__.json_output[ __builtin__.debugid ]['Extras'].append( { "Type":"Int64", "Value":tmp } )
+            return tmp
         except struct.error as e:
             return 0
             raise IllegalParcel(e.args[0], "data[0x{:x}:0x{:x}] : {}".format(offset, self.offset, self.data[offset:self.offset].encode("hex")))
@@ -131,7 +148,9 @@ class Parcel(object):
         offset = self.offset
         self.offset += 4
         try:
-            return struct.unpack("<f", self.data[offset: self.offset])[0]
+            tmp =  struct.unpack("<f", self.data[offset: self.offset])[0]
+            __builtin__.json_output[ __builtin__.debugid ]['Extras'].append( { "Type":"Float", "Value":tmp } )
+            return tmp
         except struct.error as e:
             return 0
             raise IllegalParcel(e.args[0], "data[0x{:x}:0x{:x}] : {}".format(offset, self.offset, self.data[offset:self.offset].encode("hex")))
@@ -142,6 +161,7 @@ class Parcel(object):
         if  length < 0:
             return None
         bundle = Bundle(self, length)
+        __builtin__.json_output[ __builtin__.debugid ]['Extras'].append( { "Type":"bundle", "Value":bundle } )
         if  loader != None:
             bundle.setClassLoader(loader)
         return bundle
@@ -155,7 +175,7 @@ class Parcel(object):
 
     def readValue(self, loader):
         type = self.readInt()
-        
+
         if  type==VAL_NULL:
             return None
         elif type == VAL_STRING:
@@ -198,13 +218,15 @@ class Parcel(object):
     @hook
     def readString(self):
         result = self.readString16()
+        __builtin__.json_output[ __builtin__.debugid ]['Extras'].append( { "Type":"String", "Value":result } )
         return result
 
     @hook
     def readStringArray(self):
         length = self.readInt()
+        tmp =  [self.readString() for i in range(length)]
         if  0 <= length:
-            return [self.readString() for i in range(length)]
+            return tmp
         else:
             return None
 
@@ -236,7 +258,8 @@ class Parcel(object):
         self.offset = (self.offset + 3) &~ 3
         if  self.offset > len(self.data):
             raise IllegalParcel("Offset out of bound.", "from offset: 0x{:x}, get length: {}, become: {}".format(offset, length, self.offset))
-        return String(self.data[offset: self.offset].decode("utf16").encode("utf8").strip("\x00"))
+        tmp = String(self.data[offset: self.offset].decode("utf16").encode("utf8").strip("\x00"))
+        return tmp
 
     @hook
     def readParcelable(self, loader):

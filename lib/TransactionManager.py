@@ -1,3 +1,4 @@
+
 import logging
 from datetime import datetime
 from collections import defaultdict
@@ -9,7 +10,12 @@ import Module
 
 import tools.Config as Config
 
+import __builtin__
+
+
 logger = logging.getLogger(__name__)
+
+
 
 hardwareDescriptors = [
     #"android.net.INetworkStatsService",
@@ -104,6 +110,7 @@ class TransactionManager(object):
         
 
     def solve(self, tra):
+        global json_output;
         if  tra.type == "BC_TRANSACTION":
             try:
                 descriptor, code = self.lookup(tra)
@@ -122,16 +129,36 @@ class TransactionManager(object):
             if  not Config.NOT_SOLVE:
                 print "=============================="
                 #print "#{}[{}] {} ==> {} / [{}]: {}".format(tra.debug_id, datetime.fromtimestamp(tra.time).strftime('%Y-%m-%d %H:%M:%S'), tra.from_proc_name, tra.to_proc_name, descriptor, code)
+                
+                __builtin__.json_output[tra.debug_id] = {}
+                __builtin__.json_output[tra.debug_id]['Source'] = tra.from_proc_name
+                __builtin__.json_output[tra.debug_id]['Target'] = tra.to_proc_name
+                __builtin__.json_output[tra.debug_id]['Transact_code'] = code
+                __builtin__.json_output[tra.debug_id]['Class'] = descriptor
+                __builtin__.json_output[tra.debug_id]['Action'] = '?'
+                __builtin__.json_output[tra.debug_id]['requestCode'] = '?'
+                __builtin__.json_output[tra.debug_id]['resultCode'] = '?'
+                __builtin__.json_output[tra.debug_id]['Extras'] = []
+                
                 print "#{} {} ==> {} / [{}]: {}".format(tra.debug_id, tra.from_proc_name, tra.to_proc_name, descriptor, code)
                 #print "{{{"
+                
+                __builtin__.debugid = tra.debug_id
                 result = self.sSolver.solve(descriptor, code, tra.parcel)
                 #print "}}}"
+            
+                
 
+            
                 if  result:
                     print "\t{}({})".format(result[0], ", ".join(str(i) for i in result[1:]))
                     Module.getModule().call("SOLVING_SUCCESS", *result)
+                    __builtin__.json_output[tra.debug_id]['Result'] = { "Name":result[0], "Params":result[1:] }
                 else:
                     Module.getModule().call("SOLVING_FAIL")
+
+                
+                __builtin__.debugid = -1
         """
         else:
             print tra
