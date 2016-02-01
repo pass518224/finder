@@ -121,9 +121,7 @@ class Parcel(object):
     def readInt32(self):
         offset = self.offset
         self.offset += 4
-        
-        print( help(__builtin__) )
-        
+
         try:
 
             tmp =  struct.unpack("<i", self.data[offset: self.offset])[0]
@@ -137,7 +135,6 @@ class Parcel(object):
         self.offset += 8
         try:
             tmp = struct.unpack("<i", self.data[offset: self.offset])[0]
-            __builtin__.json_output[ __builtin__.debugid ]['Extras'].append( { "Type":"Int64", "Value":tmp } )
             return tmp
         except struct.error as e:
             return 0
@@ -214,7 +211,7 @@ class Parcel(object):
             return self.createLongArray()
         elif type == VAL_BYTE:
             return self.readByte()
-        
+
     @hook
     def readString(self):
         result = self.readString16()
@@ -250,8 +247,7 @@ class Parcel(object):
 
     def readString16(self):
         length = self.readInt32()
-        if  length < 0:
-            return None
+        if  length < 0: return None
         length += 1
         offset = self.offset
         self.offset += length*2
@@ -358,7 +354,7 @@ class Parcel(object):
             printable = ''.join(["%s" % ((ord(x) <= 127 and FILTER[ord(x)]) or '.') for x in chars])
             lines.append("%04x  %-*s  %s\n" % (c, length*3, hex, printable))
         return ''.join(lines)
-        
+
 class IllegalParcel(Exception):
     pass
 
