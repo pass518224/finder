@@ -279,8 +279,22 @@ class Parcel(object):
 
     @hook
     def createTypedArrayList(self, creator):
+        """ temporary fix """
         if  type(creator) == str:
-            print creator
+            if creator == "ResultInfo":
+                from android.app.ResultInfo import *
+                creator = ResultInfo.CREATOR
+            elif creator == "ProviderInfo":
+                from android.content.pm.ProviderInfo import *
+                creator = ProviderInfo.CREATOR
+            elif creator == "ContentProviderHolder":
+                from android.app.IActivityManager import *
+                creator = ContentProviderHolder.CREATOR
+            elif creator == "ReferrerIntent":
+                from com.android.internal.content.ReferrerIntent import *
+                creator = ReferrerIntent.CREATOR
+            else:
+                print creator
         n = self.readInt()
         if  n < 0:
             return None
@@ -296,6 +310,19 @@ class Parcel(object):
 
     @hook
     def createTypedArray(self, creator):
+        """ temporary fix """
+        if  type(creator) == str:
+            if creator == "Intent":
+                from android.content.Intent import *
+                creator = Intent.CREATOR
+            elif creator == "android.view.inputmethod.InputMethodSubtype":
+                from android.view.inputmethod.InputMethodSubtype import *
+                creator = InputMethodSubtype.CREATOR
+            elif creator == "android.content.ComponentName":
+                from android.content.ComponentName import *
+                creator = ComponentName.CREATOR
+            else:
+                print creator
         n = self.readInt()
         if  n < 0:
             return None
