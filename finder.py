@@ -67,8 +67,11 @@ def finder(fd, filter=None, ps=None):
 
     #finder end hook point
     Module.getModule().call("FINDER_END")
-    
-    print ( __builtin__.json_output )
+   
+    f = open("output.json",'w');
+    f.write(json.dumps(__builtin__.json_output,indent=4, separators=(',', ': '), sort_keys=True))
+    f.close()
+#   print ( __builtin__.json_output )
 
 def parseArgument():
     """

@@ -14,6 +14,7 @@ from Bundle import Bundle
 
 import tools.Config as Config
 import __builtin__
+import re
 
 logger = logging.getLogger(__name__)
 BYTE = 4
@@ -30,6 +31,8 @@ def hook(func):
         _result = func(self, *args, **kargs)
         self.test = '123213'
         print "\t{}    #{}".format(code, _result)
+        key = re.match(r"(?P<key_name>[a-zA-Z0-9_]*)=*",code)
+        __builtin__.json_output[__builtin__.debugid]['Extras'][key.groupdict()["key_name"]]=str(_result)
         return _result
     return hookFunction
 
@@ -75,7 +78,7 @@ class Parcel(object):
     @hook
     def enforceInterface(self, descriptor):
         policy = self.readInt()
-        __builtin__.json_output[ __builtin__.debugid ]['Extras'].append( { "Type":"Int", "Value":policy } )
+#       __builtin__.json_output[ __builtin__.debugid ]['Extras'].append( { "Type":"Int", "Value":policy } )
         return self.readString()
 
     @hook
@@ -104,18 +107,18 @@ class Parcel(object):
     @hook
     def readByte(self):
         tmp = self.readInt()
-        __builtin__.json_output[ __builtin__.debugid ]['Extras'].append( { "Type":"Byte", "Value":tmp&0xff } )
+#       __builtin__.json_output[ __builtin__.debugid ]['Extras'].append( { "Type":"Byte", "Value":tmp&0xff } )
         return tmp & 0xff
 
     @hook
     def readLong(self):
         tmp = self.readInt64()
-        __builtin__.json_output[ __builtin__.debugid ]['Extras'].append( { "Type":"Long", "Value":tmp } )
+#       __builtin__.json_output[ __builtin__.debugid ]['Extras'].append( { "Type":"Long", "Value":tmp } )
         return tmp
     @hook
     def readInt(self):
         tmp = self.readInt32()
-        __builtin__.json_output[ __builtin__.debugid ]['Extras'].append( { "Type":"Int32", "Value":tmp } )
+#       __builtin__.json_output[ __builtin__.debugid ]['Extras'].append( { "Type":"Int32", "Value":tmp } )
         return tmp
 
     def readInt32(self):
@@ -146,7 +149,7 @@ class Parcel(object):
         self.offset += 4
         try:
             tmp =  struct.unpack("<f", self.data[offset: self.offset])[0]
-            __builtin__.json_output[ __builtin__.debugid ]['Extras'].append( { "Type":"Float", "Value":tmp } )
+#           __builtin__.json_output[ __builtin__.debugid ]['Extras'].append( { "Type":"Float", "Value":tmp } )
             return tmp
         except struct.error as e:
             return 0
@@ -158,7 +161,7 @@ class Parcel(object):
         if  length < 0:
             return None
         bundle = Bundle(self, length)
-        __builtin__.json_output[ __builtin__.debugid ]['Extras'].append( { "Type":"bundle", "Value":bundle } )
+#       __builtin__.json_output[ __builtin__.debugid ]['Extras'].append( { "Type":"bundle", "Value":bundle } )
         if  loader != None:
             bundle.setClassLoader(loader)
         return bundle
@@ -215,7 +218,7 @@ class Parcel(object):
     @hook
     def readString(self):
         result = self.readString16()
-        __builtin__.json_output[ __builtin__.debugid ]['Extras'].append( { "Type":"String", "Value":result } )
+#       __builtin__.json_output[ __builtin__.debugid ]['Extras'].append( { "Type":"String", "Value":result } )
         return result
 
     @hook

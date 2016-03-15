@@ -135,10 +135,10 @@ class TransactionManager(object):
                 __builtin__.json_output[tra.debug_id]['Target'] = tra.to_proc_name
                 __builtin__.json_output[tra.debug_id]['Transact_code'] = code
                 __builtin__.json_output[tra.debug_id]['Class'] = descriptor
-                __builtin__.json_output[tra.debug_id]['Action'] = '?'
-                __builtin__.json_output[tra.debug_id]['requestCode'] = '?'
-                __builtin__.json_output[tra.debug_id]['resultCode'] = '?'
-                __builtin__.json_output[tra.debug_id]['Extras'] = []
+#               __builtin__.json_output[tra.debug_id]['Action'] = '?'
+#               __builtin__.json_output[tra.debug_id]['requestCode'] = '?'
+#               __builtin__.json_output[tra.debug_id]['resultCode'] = '?'
+                __builtin__.json_output[tra.debug_id]['Extras'] = {}
                 
                 print "#{} {} ==> {} / [{}]: {}".format(tra.debug_id, tra.from_proc_name, tra.to_proc_name, descriptor, code)
                 #print "{{{"
@@ -153,7 +153,7 @@ class TransactionManager(object):
                 if  result:
                     print "\t{}({})".format(result[0], ", ".join(str(i) for i in result[1:]))
                     Module.getModule().call("SOLVING_SUCCESS", *result)
-                    __builtin__.json_output[tra.debug_id]['Result'] = { "Name":result[0], "Params":result[1:] }
+                    __builtin__.json_output[tra.debug_id]['Result'] = { "Name":result[0]}#, "Params":result[1:] }
                 else:
                     Module.getModule().call("SOLVING_FAIL")
 
