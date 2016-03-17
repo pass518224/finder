@@ -18,6 +18,10 @@ from lib.FilterAdaptor import FilterAdaptor
 
 import tools.Config as Config
 
+import __builtin__
+
+__builtin__.json_output = {}
+
 def finder(fd, filter=None, ps=None):
     """finder entry function"""
     sys_log = Parse.Parser(fd)
@@ -63,6 +67,11 @@ def finder(fd, filter=None, ps=None):
 
     #finder end hook point
     Module.getModule().call("FINDER_END")
+   
+    f = open("output.json",'w');
+    f.write(json.dumps(__builtin__.json_output,indent=4, separators=(',', ': '), sort_keys=True))
+    f.close()
+#   print ( __builtin__.json_output )
 
 def parseArgument():
     """
