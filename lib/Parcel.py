@@ -87,9 +87,10 @@ class Parcel(object):
 
     @hook
     def readObject(self, nullMetaData):
+        offset = self.offset
         self.offset += BYTE *4
         """ TODO """
-        return "<<Strong binder>>"
+        return "<<Strong binder: {}>>".format(self.data[offset: self.offset].encode('hex'))
 
     @hook
     def readPersistableBundle(self, loader=None):

@@ -6,4 +6,6 @@ class IBinder(object):
     def asInterface(self, cls):
         return cls
 
+    def __str__(self):
+        return self.name
         
