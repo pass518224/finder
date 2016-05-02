@@ -135,7 +135,7 @@ class TransactionManager(object):
                     __builtin__.json_output[tra.debug_id]['Source'] = tra.from_proc_name
                     __builtin__.json_output[tra.debug_id]['Target'] = tra.to_proc_name
                     __builtin__.json_output[tra.debug_id]['Transact_code'] = code
-                    __builtin__.json_output[tra.debug_id]['Class'] = descriptor
+                    __builtin__.json_output[tra.debug_id]['Descriptor'] = descriptor
                 
                 print "#{} {} ==> {} / [{}]: {}".format(tra.debug_id, tra.from_proc_name, tra.to_proc_name, descriptor, code)
                 #print "{{{"
