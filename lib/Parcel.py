@@ -31,17 +31,18 @@ def hook(func):
 
         _result = func(self, *args, **kargs)
 
-        if Config.DEBUG:
-            print "\t{}    #{}".format(code, _result)
+        if Config.JSONOUTPUT or Config.DEBUG:
+            result_str = str(_result)
+            print "\t{}    #{}".format(code, result_str)
 
         if Config.JSONOUTPUT:
-            json(calframe, _result)
+            json(calframe, result_str)
 
         return _result
 
-    def json(calframe, _result):
+    def json(calframe, result_str):
         code = calframe[1][4][0].replace(' ', "").replace("\n", "")
-        # not a if statement and not caller is not "enforceInterface"
+        # caller is not a if statement and caller is not "enforceInterface"
         if not re.match('(\W|^)if\W', code) and calframe[1][3] != "enforceInterface":
             # a list of keyword from call frame
             # "_" mains return statement
@@ -62,9 +63,9 @@ def hook(func):
                         keylistlist[0] = [(res.group(1), t)] + keylistlist[0]
                     return res
                 # search all assign statement (exclude == and !=)
-                if searchAndAppend('(\w*)=[^=]'): pass
+                if searchAndAppend('(\w+)=[^=]'): pass
                 # ex. ".setAction()"
-                elif searchAndAppend('\.set(\w*)'): pass
+                elif searchAndAppend('\.set(\w+)'): pass
                 # ex. "readStringList()"
                 elif searchAndAppend('read(\w*List)'): pass
                 # ex. "arrayList.add(...)""
@@ -118,9 +119,9 @@ def hook(func):
                     if key[1] == 'list':
                         if key[0] not in subobject:
                             subobject[key[0]] = []
-                        subobject[key[0]].append(str(_result))
+                        subobject[key[0]].append(result_str)
                     else:
-                        subobject[key[0]] = str(_result)
+                        subobject[key[0]] = result_str
 
     return hookFunction
 
