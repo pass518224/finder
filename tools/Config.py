@@ -91,6 +91,7 @@ else:
 
 DEBUG = False
 NOT_SOLVE = False
+JSONOUTPUT = None
 
 if __name__ == '__main__':
     Path.dump()

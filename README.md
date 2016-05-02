@@ -25,14 +25,14 @@ Usage
 
     usage: finder.py [-h] [-d] [-s SENDER | -r RECEIVER | -c CONTAIN] [-n]
                      [--black-list FILEPATH] [--info] [--not-solve]
-                     [--ps CHROME.PS]
+                     [--ps CHROME.PS] [--json output.json]
                      [input]
-    
+
     finder - Android ICC parser
-    
+
     positional arguments:
       input                 ICC log file.
-    
+
     optional arguments:
       -h, --help            show this help message and exit
       -d, --debug           enable debug trace
@@ -48,7 +48,7 @@ Usage
       --info                show log info
       --not-solve           not to solve ICC data
       --ps CHROME.PS        ps cmd result
-
+      --json output.json    json output filename
 
 Finder need `android repo` which compiled from android java source code to help for solving transaction data.
 

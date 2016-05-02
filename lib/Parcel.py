@@ -21,19 +21,107 @@ BYTE = 4
 
 def hook(func):
     def hookFunction(self, *args, **kargs):
-        if  not Config.DEBUG:
-            _result = func(self, *args, **kargs)
-            return _result
-        curframe = inspect.currentframe()
-        calframe = inspect.getouterframes(curframe, 1)
-        code = calframe[1][4][0].replace(' ', "").replace("\n", "")
-        print "module: {}:{}".format(calframe[1][1], calframe[1][2])
+        if Config.DEBUG or Config.JSONOUTPUT:
+            curframe = inspect.currentframe()
+            calframe = inspect.getouterframes(curframe, 1)
+            code = calframe[1][4][0].replace(' ', "").replace("\n", "")
+
+        if Config.DEBUG:
+            print "module: {}:{}".format(calframe[1][1], calframe[1][2])
+
         _result = func(self, *args, **kargs)
-        self.test = '123213'
-        print "\t{}    #{}".format(code, _result)
-        key = re.match(r"(?P<key_name>[a-zA-Z0-9_]*)=*",code)
-        __builtin__.json_output[__builtin__.debugid]['Extras'][key.groupdict()["key_name"]]=str(_result)
+
+        if Config.DEBUG:
+            print "\t{}    #{}".format(code, _result)
+
+        if Config.JSONOUTPUT:
+            json(calframe, _result)
+
         return _result
+
+    def json(calframe, _result):
+        code = calframe[1][4][0].replace(' ', "").replace("\n", "")
+        # not a if statement and not caller is not "enforceInterface"
+        if not re.match('(\W|^)if\W', code) and calframe[1][3] != "enforceInterface":
+            # a list of keyword from call frame
+            # "_" mains return statement
+            keylist = [] if calframe[1][4][0].find("return") < 0 else [("_", None)]
+            # a wrapper of keylist because of the closure
+            keylistlist = [keylist]
+
+            # traverse call frame
+            for f in calframe[1:]:
+                # skip hookFunction and creatorResolver
+                if f[3] == "hookFunction" or f[3] == "creatorResolver":
+                    continue
+                stmt = f[4][0].replace(' ', '')
+                # search the pattern in stmt, and add result to keylist
+                def searchAndAppend(expression, t = None):
+                    res = re.search(expression, stmt)
+                    if res:
+                        keylistlist[0] = [(res.group(1), t)] + keylistlist[0]
+                    return res
+                # search all assign statement (exclude == and !=)
+                if searchAndAppend('(\w*)=[^=]'): pass
+                # ex. ".setAction()"
+                elif searchAndAppend('\.set(\w*)'): pass
+                # ex. "readStringList()"
+                elif searchAndAppend('read(\w*List)'): pass
+                # ex. "arrayList.add(...)""
+                elif searchAndAppend('(\w+)\.add', 'list'): pass
+                # ex "readArrayMapInternel()"
+                elif searchAndAppend('read(\w*ArrayMap)', 'list'): pass
+                # stop condition
+                if f[3] == "onTransact":
+                    break
+
+            keylist = keylistlist[0]
+            # restore result
+            if keylist != []:
+                # recursive function
+                # based on keylist, find a object to restore result
+                # return None if the result is already in subobject
+                def search(subobject, keylist):
+                    key = keylist[0]
+                    # end condition
+                    if len(keylist) == 1:
+                        if isinstance(subobject, dict):
+                            if key[1] == "list":
+                                return subobject
+                            else:
+                                return None if (key[0] in subobject) else subobject
+                        elif isinstance(subobject, list):
+                            for asdf in subobject:
+                                if key[0] not in asdf:
+                                    return asdf
+                            subobject.append({})
+                            return subobject[-1]
+
+                    # recursive
+                    if isinstance(subobject, dict):
+                        if key[0] not in subobject:
+                            subobject[key[0]] = {} if key[1] != "list" else []
+                        return search(subobject[key[0]], keylist[1:])
+                    elif isinstance(subobject, list):
+                        for obj in subobject:
+                            res = search(obj, keylist[1:])
+                            if res != None:
+                                return res
+                        subobject.append({})
+                        return search(subobject[-1], keylist)
+
+                # search start from __builtin__.json_output[__builtin__.debugid]
+                subobject = search(__builtin__.json_output[__builtin__.debugid], keylist)
+                key = keylist[-1]
+                # restore result
+                if isinstance(subobject, dict):
+                    if key[1] == 'list':
+                        if key[0] not in subobject:
+                            subobject[key[0]] = []
+                        subobject[key[0]].append(str(_result))
+                    else:
+                        subobject[key[0]] = str(_result)
+
     return hookFunction
 
 VAL_NULL = -1;

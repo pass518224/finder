@@ -67,11 +67,10 @@ def finder(fd, filter=None, ps=None):
 
     #finder end hook point
     Module.getModule().call("FINDER_END")
-   
-    f = open("output.json",'w');
-    f.write(json.dumps(__builtin__.json_output,indent=4, separators=(',', ': '), sort_keys=True))
-    f.close()
-#   print ( __builtin__.json_output )
+
+    # restore json output
+    if Config.JSONOUTPUT:
+        Config.JSONOUTPUT.write(json.dumps(__builtin__.json_output,indent=4, separators=(',', ': '), sort_keys=True))
 
 def parseArgument():
     """
@@ -98,6 +97,9 @@ def parseArgument():
     #ps file to complete process name
     parser.add_argument("--ps", metavar="CHROME.PS", type=file, help="ps cmd result")
 
+    #json output file name
+    parser.add_argument("--json", metavar="output.json", type=argparse.FileType('w'), help="json output filename")
+
     args = parser.parse_args()
 
     #setup debug flag
@@ -105,6 +107,10 @@ def parseArgument():
 
     #setup not solve flag
     Config.NOT_SOLVE = args.not_solve
+
+    #setup jsonoutput file stream
+    Config.JSONOUTPUT = args.json
+
     return args
 
 if __name__ == '__main__':
