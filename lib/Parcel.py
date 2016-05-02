@@ -46,16 +46,19 @@ def hook(func):
         code = calframe[1][4][0].replace(' ', "").replace("\n", "")
         # caller is not a if statement and caller is not "enforceInterface"
         if not re.match('(\W|^)if\W', code) and calframe[1][3] != "enforceInterface":
-            # a list of keyword from call frame
+            # keylist is a list of keyword, parsed from call frame
             # "_" mains return statement
-            keylist = [] if calframe[1][4][0].find("return") < 0 else [("_", None)]
+            if calframe[1][4][0].find("return") >= 0 and calframe[1][3] != "readStrongBinder":
+                keylist = [("_", None)]
+            else:
+                keylist = []
             # a wrapper of keylist because of the closure
             keylistlist = [keylist]
 
             # traverse call frame
             for f in calframe[1:]:
                 # skip hookFunction and creatorResolver
-                if f[3] == "hookFunction" or f[3] == "creatorResolver":
+                if f[3] in ("hookFunction", "creatorResolver"):
                     continue
                 stmt = f[4][0].replace(' ', '')
                 # search the pattern in stmt, and add result to keylist
