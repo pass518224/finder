@@ -33,6 +33,8 @@ def hook(func):
 
         if Config.JSONOUTPUT or Config.DEBUG:
             result_str = str(_result)
+
+        if Config.DEBUG:
             print "\t{}    #{}".format(code, result_str)
 
         if Config.JSONOUTPUT:
