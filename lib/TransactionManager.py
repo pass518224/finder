@@ -151,7 +151,7 @@ class TransactionManager(object):
                     print "\t{}({})".format(result[0], ", ".join(str(i) for i in result[1:]))
                     Module.getModule().call("SOLVING_SUCCESS", *result)
                     if Config.JSONOUTPUT:
-                        __builtin__.json_output[tra.debug_id]['Result'] = { "Name":str(result[0]), "Params":str(result[1:]) }
+                        __builtin__.json_output[tra.debug_id]['Result'] = { "Name":str(result[0]), "Params":[ str(arg) for arg in result[1:]] }
                 else:
                     Module.getModule().call("SOLVING_FAIL")
 
